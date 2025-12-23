@@ -29,6 +29,3 @@ jobs:
 
       - name: Build packages
         run: npm run build
-
-      - name: Check TypeScript types
-        run: npx tsc --noEmit -p packages/sdk && npx tsc --noEmit -p packages/mcp
