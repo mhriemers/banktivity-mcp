@@ -7,7 +7,8 @@
   "scripts": {
     "build": "npm run build --workspaces",
     "clean": "npm run clean --workspaces --if-present",
-    "start": "npm run start -w banktivity-mcp"
+    "start": "npm run start -w @mhriemers/banktivity-mcp",
+    "version": "npm version --workspaces --no-git-tag-version"
   },
   "devDependencies": {
     "typescript": "^5.7.2"

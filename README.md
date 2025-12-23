@@ -6,16 +6,15 @@ A TypeScript SDK and MCP (Model Context Protocol) server for accessing Banktivit
 
 This monorepo contains two packages:
 
-- **`banktivity-sdk`** - A standalone TypeScript SDK for interacting with Banktivity databases
-- **`banktivity-mcp`** - An MCP server built on top of the SDK for use with Claude Desktop
+- **`@mhriemers/banktivity-sdk`** - A standalone TypeScript SDK for interacting with Banktivity databases
+- **`@mhriemers/banktivity-mcp`** - An MCP server built on top of the SDK for use with Claude Desktop and Claude Code
 
 ## Quick Start
 
-### Installation
+### Installation from npm
 
 ```bash
-npm install
-npm run build
+npm install -g @mhriemers/banktivity-mcp
 ```
 
 ### Usage with Claude Desktop
@@ -26,8 +25,8 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
 {
   "mcpServers": {
     "banktivity": {
-      "command": "node",
-      "args": ["/path/to/banktivity-mcp/packages/mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["@mhriemers/banktivity-mcp"],
       "env": {
         "BANKTIVITY_FILE_PATH": "/path/to/your/Personal.bank8"
       }
@@ -36,12 +35,37 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
 }
 ```
 
+### Usage with Claude Code
+
+Add the MCP server using the Claude Code CLI:
+
+```bash
+claude mcp add banktivity -- npx @mhriemers/banktivity-mcp
+```
+
+Then set the environment variable:
+
+```bash
+export BANKTIVITY_FILE_PATH="/path/to/your/Personal.bank8"
+```
+
+### Development Setup
+
+If you want to run from source:
+
+```bash
+git clone https://github.com/mhriemers/banktivity-mcp.git
+cd banktivity-mcp
+npm install
+npm run build
+```
+
 ## SDK Usage
 
 The SDK can be used independently in any TypeScript/JavaScript project:
 
 ```typescript
-import { BanktivityClient } from "banktivity-sdk";
+import { BanktivityClient } from "@mhriemers/banktivity-sdk";
 
 const client = new BanktivityClient({ filePath: "/path/to/file.bank8" });
 
@@ -216,7 +240,7 @@ banktivity-mcp/
 ├── package.json              # Root workspace config
 ├── tsconfig.base.json        # Shared TypeScript config
 ├── packages/
-│   ├── sdk/                  # banktivity-sdk package
+│   ├── sdk/                  # @mhriemers/banktivity-sdk package
 │   │   ├── src/
 │   │   │   ├── index.ts      # Main exports
 │   │   │   ├── client.ts     # BanktivityClient class
@@ -228,7 +252,7 @@ banktivity-mcp/
 │   │   │   └── repositories/ # Data access layer
 │   │   └── package.json
 │   │
-│   └── mcp/                  # banktivity-mcp package
+│   └── mcp/                  # @mhriemers/banktivity-mcp package
 │       ├── src/
 │       │   ├── index.ts      # MCP server entry point
 │       │   └── tools/        # Tool implementations

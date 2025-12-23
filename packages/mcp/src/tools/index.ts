@@ -1,5 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { BanktivityClient } from "banktivity-sdk";
+import { BanktivityClient } from "@mhriemers/banktivity-sdk";
 
 import { registerAccountTools } from "./accounts.js";
 import { registerTransactionTools } from "./transactions.js";

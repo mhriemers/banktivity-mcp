@@ -1,5 +1,5 @@
 {
-  "name": "banktivity-sdk",
+  "name": "@mhriemers/banktivity-sdk",
   "version": "1.0.0",
   "description": "TypeScript SDK for Banktivity personal finance data",
   "type": "module",
@@ -15,6 +15,18 @@
     "dist",
     "README.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mhriemers/banktivity-mcp.git",
+    "directory": "packages/sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/mhriemers/banktivity-mcp/issues"
+  },
+  "homepage": "https://github.com/mhriemers/banktivity-mcp/tree/main/packages/sdk#readme",
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist"

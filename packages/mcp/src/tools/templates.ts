@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { BanktivityClient } from "banktivity-sdk";
+import { BanktivityClient } from "@mhriemers/banktivity-sdk";
 import { jsonResponse, errorResponse, successResponse } from "./helpers.js";
 
 /**

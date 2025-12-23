@@ -2,7 +2,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { BanktivityClient } from "banktivity-sdk";
+import { BanktivityClient } from "@mhriemers/banktivity-sdk";
 import { registerAllTools } from "./tools/index.js";
 
 const BANK_FILE_PATH = process.env.BANKTIVITY_FILE_PATH;

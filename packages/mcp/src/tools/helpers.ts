@@ -1,4 +1,4 @@
-import { BanktivityClient } from "banktivity-sdk";
+import { BanktivityClient } from "@mhriemers/banktivity-sdk";
 
 /**
  * Tool response types - uses index signature for MCP SDK compatibility

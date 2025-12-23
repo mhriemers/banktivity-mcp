@@ -1,5 +1,5 @@
 {
-  "name": "banktivity-mcp",
+  "name": "@mhriemers/banktivity-mcp",
   "version": "1.0.0",
   "description": "MCP server for Banktivity personal finance data",
   "type": "module",
@@ -7,6 +7,22 @@
   "bin": {
     "banktivity-mcp": "dist/index.js"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mhriemers/banktivity-mcp.git",
+    "directory": "packages/mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/mhriemers/banktivity-mcp/issues"
+  },
+  "homepage": "https://github.com/mhriemers/banktivity-mcp/tree/main/packages/mcp#readme",
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
@@ -22,7 +38,7 @@
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.1",
-    "banktivity-sdk": "^1.0.0",
+    "@mhriemers/banktivity-sdk": "^1.0.0",
     "zod": "^4.2.1"
   },
   "devDependencies": {
