@@ -48,8 +48,10 @@ export function createTestDatabase(): Database.Database {
       Z_ENT INTEGER,
       Z_OPT INTEGER,
       ZPPARENT INTEGER,
-      ZPCURRENCY INTEGER,
+      ZCURRENCY INTEGER,
       ZPACCOUNTCLASS INTEGER,
+      ZPDEBIT INTEGER DEFAULT 1,
+      ZPTAXABLE INTEGER DEFAULT 0,
       ZPNAME TEXT,
       ZPFULLNAME TEXT,
       ZPHIDDEN INTEGER DEFAULT 0,
@@ -121,6 +123,80 @@ export function createTestDatabase(): Database.Database {
     )
   `);
 
+  // Create transaction template table
+  db.exec(`
+    CREATE TABLE ZTRANSACTIONTEMPLATE (
+      Z_PK INTEGER PRIMARY KEY AUTOINCREMENT,
+      Z_ENT INTEGER,
+      Z_OPT INTEGER,
+      ZPACTIVE INTEGER DEFAULT 1,
+      ZPFIXEDAMOUNT INTEGER DEFAULT 1,
+      ZPCREATIONTIME REAL,
+      ZPMODIFICATIONDATE REAL,
+      ZPLASTAPPLIEDDATE REAL,
+      ZPAMOUNT REAL,
+      ZPCURRENCYID TEXT,
+      ZPNOTE TEXT,
+      ZPTITLE TEXT,
+      ZPUNIQUEID TEXT
+    )
+  `);
+
+  // Create line item template table
+  db.exec(`
+    CREATE TABLE ZLINEITEMTEMPLATE (
+      Z_PK INTEGER PRIMARY KEY AUTOINCREMENT,
+      Z_ENT INTEGER,
+      Z_OPT INTEGER,
+      ZPFIXEDAMOUNT INTEGER DEFAULT 1,
+      ZPTRANSACTIONTEMPLATE INTEGER,
+      ZPCREATIONTIME REAL,
+      ZPTRANSACTIONAMOUNT REAL,
+      ZPACCOUNTID TEXT,
+      ZPMEMO TEXT,
+      FOREIGN KEY (ZPTRANSACTIONTEMPLATE) REFERENCES ZTRANSACTIONTEMPLATE(Z_PK)
+    )
+  `);
+
+  // Create template selector table (for import rules and scheduled transactions)
+  db.exec(`
+    CREATE TABLE ZTEMPLATESELECTOR (
+      Z_PK INTEGER PRIMARY KEY AUTOINCREMENT,
+      Z_ENT INTEGER,
+      Z_OPT INTEGER,
+      ZPTRANSACTIONTEMPLATE INTEGER,
+      ZPRECURRINGTRANSACTION INTEGER,
+      ZPCREATIONTIME REAL,
+      ZPMODIFICATIONDATE REAL,
+      ZPSTARTDATE REAL,
+      ZPEXTERNALCALENDARNEXTDATE REAL,
+      ZPREPEATINTERVAL INTEGER,
+      ZPREPEATMULTIPLIER INTEGER,
+      ZPDETAILSEXPRESSION TEXT,
+      ZPACCOUNTID TEXT,
+      ZPPAYEE TEXT,
+      ZPREMINDDAYSINADVANCE INTEGER,
+      ZPUNIQUEID TEXT,
+      FOREIGN KEY (ZPTRANSACTIONTEMPLATE) REFERENCES ZTRANSACTIONTEMPLATE(Z_PK)
+    )
+  `);
+
+  // Create recurring transaction table
+  db.exec(`
+    CREATE TABLE ZRECURRINGTRANSACTION (
+      Z_PK INTEGER PRIMARY KEY AUTOINCREMENT,
+      Z_ENT INTEGER,
+      Z_OPT INTEGER,
+      ZPATTRIBUTES INTEGER,
+      ZPPRIORITY INTEGER,
+      ZPREMINDDAYSINADVANCE INTEGER,
+      ZPCREATIONTIME REAL,
+      ZPFIRSTUNPROCESSEDEVENTDATE REAL,
+      ZPMODIFICATIONDATE REAL,
+      ZPUNIQUEID TEXT
+    )
+  `);
+
   return db;
 }
 
@@ -150,7 +226,7 @@ export function seedTestDatabase(db: Database.Database): TestData {
   // Insert checking account
   const checkingResult = db.prepare(`
     INSERT INTO ZACCOUNT (
-      Z_ENT, Z_OPT, ZPCURRENCY, ZPACCOUNTCLASS,
+      Z_ENT, Z_OPT, ZCURRENCY, ZPACCOUNTCLASS,
       ZPNAME, ZPFULLNAME, ZPCREATIONTIME, ZPMODIFICATIONDATE, ZPUNIQUEID
     ) VALUES (?, 0, ?, ?, 'Checking', 'Checking', ?, ?, ?)
   `).run(Z_ENT.ACCOUNT, currencyId, ACCOUNT_CLASS.CHECKING, now, now, generateUUID());
@@ -159,7 +235,7 @@ export function seedTestDatabase(db: Database.Database): TestData {
   // Insert savings account
   const savingsResult = db.prepare(`
     INSERT INTO ZACCOUNT (
-      Z_ENT, Z_OPT, ZPCURRENCY, ZPACCOUNTCLASS,
+      Z_ENT, Z_OPT, ZCURRENCY, ZPACCOUNTCLASS,
       ZPNAME, ZPFULLNAME, ZPCREATIONTIME, ZPMODIFICATIONDATE, ZPUNIQUEID
     ) VALUES (?, 0, ?, ?, 'Savings', 'Savings', ?, ?, ?)
   `).run(Z_ENT.ACCOUNT, currencyId, ACCOUNT_CLASS.SAVINGS, now, now, generateUUID());
@@ -168,7 +244,7 @@ export function seedTestDatabase(db: Database.Database): TestData {
   // Insert expense category
   const expenseResult = db.prepare(`
     INSERT INTO ZACCOUNT (
-      Z_ENT, Z_OPT, ZPCURRENCY, ZPACCOUNTCLASS,
+      Z_ENT, Z_OPT, ZCURRENCY, ZPACCOUNTCLASS,
       ZPNAME, ZPFULLNAME, ZPCREATIONTIME, ZPMODIFICATIONDATE, ZPUNIQUEID
     ) VALUES (?, 0, ?, ?, 'Groceries', 'Expenses:Groceries', ?, ?, ?)
   `).run(Z_ENT.CATEGORY, currencyId, ACCOUNT_CLASS.EXPENSE, now, now, generateUUID());
@@ -177,7 +253,7 @@ export function seedTestDatabase(db: Database.Database): TestData {
   // Insert income category
   const incomeResult = db.prepare(`
     INSERT INTO ZACCOUNT (
-      Z_ENT, Z_OPT, ZPCURRENCY, ZPACCOUNTCLASS,
+      Z_ENT, Z_OPT, ZCURRENCY, ZPACCOUNTCLASS,
       ZPNAME, ZPFULLNAME, ZPCREATIONTIME, ZPMODIFICATIONDATE, ZPUNIQUEID
     ) VALUES (?, 0, ?, ?, 'Salary', 'Income:Salary', ?, ?, ?)
   `).run(Z_ENT.CATEGORY, currencyId, ACCOUNT_CLASS.INCOME, now, now, generateUUID());
