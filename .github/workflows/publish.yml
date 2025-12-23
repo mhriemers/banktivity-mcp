@@ -11,6 +11,7 @@ jobs:
 
     permissions:
       contents: read
+      id-token: write
 
     steps:
       - name: Checkout repository
@@ -37,11 +38,7 @@ jobs:
         run: npm version ${{ steps.version.outputs.VERSION }} --workspaces --no-git-tag-version --allow-same-version
 
       - name: Publish SDK package
-        run: npm publish -w @mhriemers/banktivity-sdk --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish -w @mhriemers/banktivity-sdk --provenance --access public
 
       - name: Publish MCP package
-        run: npm publish -w @mhriemers/banktivity-mcp --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish -w @mhriemers/banktivity-mcp --provenance --access public
