@@ -509,6 +509,182 @@ server.registerTool(
   }
 );
 
+// ============================================
+// LINE ITEM TOOLS
+// ============================================
+
+server.registerTool(
+  "get_line_item",
+  {
+    title: "Get Line Item",
+    description: "Get a specific line item by ID",
+    inputSchema: {
+      line_item_id: z.number().describe("The line item ID"),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ line_item_id }) => {
+    const lineItem = db.getLineItemById(line_item_id);
+    if (!lineItem) {
+      return {
+        content: [{ type: "text", text: `Line item not found: ${line_item_id}` }],
+        isError: true,
+      };
+    }
+    return {
+      content: [{ type: "text", text: JSON.stringify(lineItem, null, 2) }],
+    };
+  }
+);
+
+server.registerTool(
+  "update_line_item",
+  {
+    title: "Update Line Item",
+    description: "Update a line item's account, amount, or memo",
+    inputSchema: {
+      line_item_id: z.number().describe("The line item ID to update"),
+      account_id: z.number().optional().describe("New account ID"),
+      account_name: z.string().optional().describe("New account name (alternative to account_id)"),
+      amount: z.number().optional().describe("New amount"),
+      memo: z.string().optional().describe("New memo"),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  async ({ line_item_id, account_id, account_name, amount, memo }) => {
+    let accountId = account_id;
+    if (!accountId && account_name) {
+      accountId = findAccountByName(account_name) ?? undefined;
+      if (!accountId) {
+        return {
+          content: [{ type: "text", text: `Account not found: ${account_name}` }],
+          isError: true,
+        };
+      }
+    }
+
+    const updates: { accountId?: number; amount?: number; memo?: string } = {};
+    if (accountId !== undefined) updates.accountId = accountId;
+    if (amount !== undefined) updates.amount = amount;
+    if (memo !== undefined) updates.memo = memo;
+
+    const success = db.updateLineItem(line_item_id, updates);
+
+    if (!success) {
+      return {
+        content: [{ type: "text", text: "Line item not found or no updates provided" }],
+        isError: true,
+      };
+    }
+
+    const lineItem = db.getLineItemById(line_item_id);
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ message: "Line item updated successfully", lineItem }, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+server.registerTool(
+  "delete_line_item",
+  {
+    title: "Delete Line Item",
+    description: "Delete a line item from a transaction",
+    inputSchema: {
+      line_item_id: z.number().describe("The line item ID to delete"),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true },
+  },
+  async ({ line_item_id }) => {
+    const lineItem = db.getLineItemById(line_item_id);
+    if (!lineItem) {
+      return {
+        content: [{ type: "text", text: `Line item not found: ${line_item_id}` }],
+        isError: true,
+      };
+    }
+
+    db.deleteLineItem(line_item_id);
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ message: "Line item deleted successfully", deletedLineItem: lineItem }, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+server.registerTool(
+  "add_line_item",
+  {
+    title: "Add Line Item",
+    description: "Add a new line item to an existing transaction",
+    inputSchema: {
+      transaction_id: z.number().describe("The transaction ID to add the line item to"),
+      account_id: z.number().optional().describe("The account ID for this line item"),
+      account_name: z.string().optional().describe("The account name (alternative to account_id)"),
+      amount: z.number().describe("The amount (positive for income/deposit, negative for expense/withdrawal)"),
+      memo: z.string().optional().describe("Optional memo for this line item"),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  async ({ transaction_id, account_id, account_name, amount, memo }) => {
+    // Verify transaction exists
+    const transaction = db.getTransactionById(transaction_id);
+    if (!transaction) {
+      return {
+        content: [{ type: "text", text: `Transaction not found: ${transaction_id}` }],
+        isError: true,
+      };
+    }
+
+    let accountId = account_id;
+    if (!accountId && account_name) {
+      accountId = findAccountByName(account_name) ?? undefined;
+    }
+
+    if (!accountId) {
+      return {
+        content: [{ type: "text", text: "Either account_id or account_name is required" }],
+        isError: true,
+      };
+    }
+
+    const lineItemId = db.addLineItemToTransaction(transaction_id, {
+      accountId,
+      amount,
+      memo,
+    });
+
+    const lineItem = db.getLineItemById(lineItemId);
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              message: "Line item added successfully",
+              lineItemId,
+              lineItem,
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  }
+);
+
 const accountTypeEnum = z.enum(["checking", "savings", "credit_card", "income", "expense"]);
 
 server.registerTool(

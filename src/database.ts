@@ -754,6 +754,168 @@ export class BanktivityDatabase {
     return true;
   }
 
+  // ============================================
+  // LINE ITEM OPERATIONS
+  // ============================================
+
+  /**
+   * Get a line item by ID
+   */
+  getLineItemById(lineItemId: number): LineItem | null {
+    const sql = `
+      SELECT
+        li.Z_PK as id,
+        li.ZPACCOUNT as accountId,
+        a.ZPNAME as accountName,
+        li.ZPTRANSACTIONAMOUNT as amount,
+        li.ZPMEMO as memo,
+        li.ZPRUNNINGBALANCE as runningBalance
+      FROM ZLINEITEM li
+      JOIN ZACCOUNT a ON li.ZPACCOUNT = a.Z_PK
+      WHERE li.Z_PK = ?
+    `;
+
+    const row = this.db.prepare(sql).get(lineItemId) as {
+      id: number;
+      accountId: number;
+      accountName: string;
+      amount: number;
+      memo: string | null;
+      runningBalance: number | null;
+    } | undefined;
+
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      accountId: row.accountId,
+      accountName: row.accountName,
+      amount: row.amount,
+      memo: row.memo,
+      runningBalance: row.runningBalance,
+    };
+  }
+
+  /**
+   * Update a line item
+   */
+  updateLineItem(
+    lineItemId: number,
+    updates: {
+      accountId?: number;
+      amount?: number;
+      memo?: string;
+    }
+  ): boolean {
+    // Get current line item to track affected accounts
+    const currentSql = `SELECT ZPACCOUNT as accountId FROM ZLINEITEM WHERE Z_PK = ?`;
+    const current = this.db.prepare(currentSql).get(lineItemId) as { accountId: number } | undefined;
+    if (!current) return false;
+
+    const affectedAccounts = new Set<number>([current.accountId]);
+
+    const setClauses: string[] = [];
+    const params: (string | number | null)[] = [];
+
+    if (updates.accountId !== undefined) {
+      setClauses.push("ZPACCOUNT = ?");
+      params.push(updates.accountId);
+      affectedAccounts.add(updates.accountId);
+    }
+
+    if (updates.amount !== undefined) {
+      setClauses.push("ZPTRANSACTIONAMOUNT = ?");
+      params.push(updates.amount);
+    }
+
+    if (updates.memo !== undefined) {
+      setClauses.push("ZPMEMO = ?");
+      params.push(updates.memo);
+    }
+
+    if (setClauses.length === 0) return false;
+
+    params.push(lineItemId);
+
+    const sql = `UPDATE ZLINEITEM SET ${setClauses.join(", ")} WHERE Z_PK = ?`;
+    const result = this.db.prepare(sql).run(...params);
+
+    // Recalculate running balances for affected accounts
+    if (result.changes > 0) {
+      for (const accountId of affectedAccounts) {
+        this.recalculateRunningBalances(accountId);
+      }
+    }
+
+    return result.changes > 0;
+  }
+
+  /**
+   * Delete a line item
+   */
+  deleteLineItem(lineItemId: number): boolean {
+    // Get the line item's account and transaction for cleanup
+    const sql = `SELECT ZPACCOUNT as accountId, ZPTRANSACTION as transactionId FROM ZLINEITEM WHERE Z_PK = ?`;
+    const lineItem = this.db.prepare(sql).get(lineItemId) as { accountId: number; transactionId: number } | undefined;
+
+    if (!lineItem) return false;
+
+    const transaction = this.db.transaction(() => {
+      // Delete tag associations first
+      this.db.prepare(`DELETE FROM Z_19PTAGS WHERE Z_19PLINEITEMS = ?`).run(lineItemId);
+
+      // Delete the line item
+      this.db.prepare(`DELETE FROM ZLINEITEM WHERE Z_PK = ?`).run(lineItemId);
+    });
+
+    transaction();
+
+    // Recalculate running balances
+    this.recalculateRunningBalances(lineItem.accountId);
+
+    return true;
+  }
+
+  /**
+   * Add a line item to an existing transaction
+   */
+  addLineItemToTransaction(
+    transactionId: number,
+    options: {
+      accountId: number;
+      amount: number;
+      memo?: string;
+    }
+  ): number {
+    const now = nowAsCoreData();
+    const uuid = generateUUID();
+
+    const sql = `
+      INSERT INTO ZLINEITEM (
+        Z_ENT, Z_OPT, ZPACCOUNT, ZPTRANSACTION,
+        ZPCREATIONTIME, ZPTRANSACTIONAMOUNT, ZPEXCHANGERATE,
+        ZPRUNNINGBALANCE, ZPMEMO, ZPUNIQUEID, ZPCLEARED
+      ) VALUES (?, 0, ?, ?, ?, ?, 1.0, 0, ?, ?, 0)
+    `;
+
+    const result = this.db.prepare(sql).run(
+      Z_ENT.LINEITEM,
+      options.accountId,
+      transactionId,
+      now,
+      options.amount,
+      options.memo ?? null,
+      uuid
+    );
+
+    const lineItemId = result.lastInsertRowid as number;
+
+    // Recalculate running balances for the affected account
+    this.recalculateRunningBalances(options.accountId);
+
+    return lineItemId;
+  }
+
   /**
    * Create a new account
    */

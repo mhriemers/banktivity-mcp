@@ -14,6 +14,7 @@ An MCP (Model Context Protocol) server that provides access to Banktivity person
 
 ### Write Operations
 - Create, update, and delete transactions
+- Add, update, and delete line items
 - Create accounts and tags
 - Tag/untag transactions
 - Reconcile transactions
@@ -75,6 +76,15 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
 | `update_transaction` | Update transaction title, date, note, or cleared status |
 | `delete_transaction` | Delete a transaction and its line items |
 | `reconcile_transactions` | Mark transactions as cleared/reconciled |
+
+### Line Item Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_line_item` | Get a specific line item by ID |
+| `update_line_item` | Update a line item's account, amount, or memo |
+| `delete_line_item` | Delete a line item from a transaction |
+| `add_line_item` | Add a new line item to an existing transaction |
 
 ### Category & Analysis Tools
 
@@ -156,6 +166,22 @@ Parameters:
 - `note` (string): Optional note/memo
 - `transaction_type` (string): Type (e.g., 'Deposit', 'Withdrawal', 'Transfer')
 - `line_items` (array, required): Array of line items with `account_id`/`account_name`, `amount`, and optional `memo`
+
+### `update_line_item`
+Parameters:
+- `line_item_id` (number, required): The line item ID to update
+- `account_id` (number): New account ID
+- `account_name` (string): New account name (alternative to account_id)
+- `amount` (number): New amount
+- `memo` (string): New memo
+
+### `add_line_item`
+Parameters:
+- `transaction_id` (number, required): The transaction ID to add the line item to
+- `account_id` (number): Account ID for the line item
+- `account_name` (string): Account name (alternative to account_id)
+- `amount` (number, required): The amount
+- `memo` (string): Optional memo
 
 ### `create_import_rule`
 Parameters:
