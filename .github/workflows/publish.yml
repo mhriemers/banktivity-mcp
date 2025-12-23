@@ -35,7 +35,7 @@ jobs:
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
       - name: Update package versions
-        run: npm version ${{ steps.version.outputs.VERSION }} --workspaces --no-git-tag-version
+        run: npm version ${{ steps.version.outputs.VERSION }} --workspaces --no-git-tag-version --allow-same-version
 
       - name: Publish SDK package
         run: npm publish -w @mhriemers/banktivity-sdk --provenance --access public
