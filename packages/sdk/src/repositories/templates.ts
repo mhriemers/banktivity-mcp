@@ -6,17 +6,17 @@ import {
   UpdateTransactionTemplateInput,
 } from "../types.js";
 import { Z_ENT } from "../constants.js";
-import { nowAsCoreData, coreDataToISO } from "../../utils/date.js";
-import { generateUUID } from "../../utils/uuid.js";
+import { nowAsCoreData, coreDataToISO } from "../utils/date.js";
+import { generateUUID } from "../utils/uuid.js";
 
 /**
  * Repository for transaction template operations
  */
 export class TransactionTemplateRepository extends BaseRepository {
   /**
-   * Get all transaction templates
+   * List all transaction templates
    */
-  getAll(): TransactionTemplate[] {
+  list(): TransactionTemplate[] {
     const sql = `
       SELECT
         Z_PK as id,
@@ -48,7 +48,7 @@ export class TransactionTemplateRepository extends BaseRepository {
   /**
    * Get transaction template by ID
    */
-  getById(templateId: number): TransactionTemplate | null {
+  get(templateId: number): TransactionTemplate | null {
     const sql = `
       SELECT
         Z_PK as id,
@@ -63,16 +63,18 @@ export class TransactionTemplateRepository extends BaseRepository {
       WHERE Z_PK = ?
     `;
 
-    const row = this.db.prepare(sql).get(templateId) as {
-      id: number;
-      title: string;
-      amount: number;
-      currencyId: string | null;
-      note: string | null;
-      active: number | null;
-      fixedAmount: number | null;
-      lastAppliedDate: number | null;
-    } | undefined;
+    const row = this.db.prepare(sql).get(templateId) as
+      | {
+          id: number;
+          title: string;
+          amount: number;
+          currencyId: string | null;
+          note: string | null;
+          active: number | null;
+          fixedAmount: number | null;
+          lastAppliedDate: number | null;
+        }
+      | undefined;
 
     if (!row) return null;
 
@@ -151,7 +153,12 @@ export class TransactionTemplateRepository extends BaseRepository {
       columnMap.active = "ZPACTIVE";
     }
 
-    const changes = this.executeUpdate("ZTRANSACTIONTEMPLATE", templateId, processedUpdates, columnMap);
+    const changes = this.executeUpdate(
+      "ZTRANSACTIONTEMPLATE",
+      templateId,
+      processedUpdates,
+      columnMap
+    );
     return changes > 0;
   }
 
@@ -160,9 +167,15 @@ export class TransactionTemplateRepository extends BaseRepository {
    */
   delete(templateId: number): boolean {
     this.runTransaction(() => {
-      this.db.prepare(`DELETE FROM ZLINEITEMTEMPLATE WHERE ZPTRANSACTIONTEMPLATE = ?`).run(templateId);
-      this.db.prepare(`DELETE FROM ZTEMPLATESELECTOR WHERE ZPTRANSACTIONTEMPLATE = ?`).run(templateId);
-      this.db.prepare(`DELETE FROM ZTRANSACTIONTEMPLATE WHERE Z_PK = ?`).run(templateId);
+      this.db
+        .prepare(`DELETE FROM ZLINEITEMTEMPLATE WHERE ZPTRANSACTIONTEMPLATE = ?`)
+        .run(templateId);
+      this.db
+        .prepare(`DELETE FROM ZTEMPLATESELECTOR WHERE ZPTRANSACTIONTEMPLATE = ?`)
+        .run(templateId);
+      this.db
+        .prepare(`DELETE FROM ZTRANSACTIONTEMPLATE WHERE Z_PK = ?`)
+        .run(templateId);
     });
 
     return true;
@@ -225,7 +238,9 @@ export class TransactionTemplateRepository extends BaseRepository {
       note: row.note,
       active: row.active === 1,
       fixedAmount: row.fixedAmount === 1,
-      lastAppliedDate: row.lastAppliedDate ? coreDataToISO(row.lastAppliedDate) : null,
+      lastAppliedDate: row.lastAppliedDate
+        ? coreDataToISO(row.lastAppliedDate)
+        : null,
       lineItems: this.getLineItemTemplates(row.id),
     };
   }

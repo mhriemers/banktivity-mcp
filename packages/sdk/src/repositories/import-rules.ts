@@ -1,17 +1,21 @@
 import { BaseRepository } from "./base.js";
-import { ImportRule, CreateImportRuleInput, UpdateImportRuleInput } from "../types.js";
+import {
+  ImportRule,
+  CreateImportRuleInput,
+  UpdateImportRuleInput,
+} from "../types.js";
 import { Z_ENT } from "../constants.js";
-import { nowAsCoreData } from "../../utils/date.js";
-import { generateUUID } from "../../utils/uuid.js";
+import { nowAsCoreData } from "../utils/date.js";
+import { generateUUID } from "../utils/uuid.js";
 
 /**
  * Repository for import rule operations
  */
 export class ImportRuleRepository extends BaseRepository {
   /**
-   * Get all import rules
+   * List all import rules
    */
-  getAll(): ImportRule[] {
+  list(): ImportRule[] {
     const sql = `
       SELECT
         ts.Z_PK as id,
@@ -26,13 +30,15 @@ export class ImportRuleRepository extends BaseRepository {
       ORDER BY tt.ZPTITLE
     `;
 
-    return this.db.prepare(sql).all(Z_ENT.IMPORT_SOURCE_TEMPLATE_SELECTOR) as ImportRule[];
+    return this.db
+      .prepare(sql)
+      .all(Z_ENT.IMPORT_SOURCE_TEMPLATE_SELECTOR) as ImportRule[];
   }
 
   /**
    * Get import rule by ID
    */
-  getById(ruleId: number): ImportRule | null {
+  get(ruleId: number): ImportRule | null {
     const sql = `
       SELECT
         ts.Z_PK as id,
@@ -46,7 +52,11 @@ export class ImportRuleRepository extends BaseRepository {
       WHERE ts.Z_PK = ? AND ts.Z_ENT = ?
     `;
 
-    const row = this.db.prepare(sql).get(ruleId, Z_ENT.IMPORT_SOURCE_TEMPLATE_SELECTOR) as ImportRule | undefined;
+    const row = this.db
+      .prepare(sql)
+      .get(ruleId, Z_ENT.IMPORT_SOURCE_TEMPLATE_SELECTOR) as
+      | ImportRule
+      | undefined;
     return row ?? null;
   }
 
@@ -101,15 +111,17 @@ export class ImportRuleRepository extends BaseRepository {
    */
   delete(ruleId: number): boolean {
     const sql = `DELETE FROM ZTEMPLATESELECTOR WHERE Z_PK = ? AND Z_ENT = ?`;
-    const result = this.db.prepare(sql).run(ruleId, Z_ENT.IMPORT_SOURCE_TEMPLATE_SELECTOR);
+    const result = this.db
+      .prepare(sql)
+      .run(ruleId, Z_ENT.IMPORT_SOURCE_TEMPLATE_SELECTOR);
     return result.changes > 0;
   }
 
   /**
    * Match a transaction description against import rules
    */
-  matchDescription(description: string): ImportRule[] {
-    const rules = this.getAll();
+  match(description: string): ImportRule[] {
+    const rules = this.list();
     const matches: ImportRule[] = [];
 
     for (const rule of rules) {

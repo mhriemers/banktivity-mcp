@@ -1,0 +1,31 @@
+{
+  "name": "banktivity-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Banktivity personal finance data",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "banktivity-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "mcp",
+    "banktivity",
+    "finance",
+    "personal-finance"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.1",
+    "banktivity-sdk": "^1.0.0",
+    "zod": "^4.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2"
+  }
+}

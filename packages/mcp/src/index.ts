@@ -2,7 +2,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { BanktivityDatabase } from "./database/index.js";
+import { BanktivityClient } from "banktivity-sdk";
 import { registerAllTools } from "./tools/index.js";
 
 const BANK_FILE_PATH = process.env.BANKTIVITY_FILE_PATH;
@@ -13,7 +13,7 @@ if (!BANK_FILE_PATH) {
   process.exit(1);
 }
 
-const db = new BanktivityDatabase(BANK_FILE_PATH);
+const client = new BanktivityClient({ filePath: BANK_FILE_PATH });
 
 const server = new McpServer({
   name: "banktivity-mcp",
@@ -21,7 +21,7 @@ const server = new McpServer({
 });
 
 // Register all tools
-registerAllTools(server, db);
+registerAllTools(server, client);
 
 // Start the server
 async function main() {

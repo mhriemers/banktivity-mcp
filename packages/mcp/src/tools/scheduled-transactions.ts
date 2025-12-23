@@ -1,12 +1,15 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { BanktivityDatabase } from "../database/index.js";
+import { BanktivityClient } from "banktivity-sdk";
 import { jsonResponse, errorResponse, successResponse } from "./helpers.js";
 
 /**
  * Register scheduled transaction-related tools
  */
-export function registerScheduledTransactionTools(server: McpServer, db: BanktivityDatabase): void {
+export function registerScheduledTransactionTools(
+  server: McpServer,
+  client: BanktivityClient
+): void {
   server.registerTool(
     "list_scheduled_transactions",
     {
@@ -16,7 +19,7 @@ export function registerScheduledTransactionTools(server: McpServer, db: Banktiv
       annotations: { readOnlyHint: true },
     },
     async () => {
-      const schedules = db.scheduledTransactions.getAll();
+      const schedules = client.scheduledTransactions.list();
       return jsonResponse(schedules);
     }
   );
@@ -32,7 +35,7 @@ export function registerScheduledTransactionTools(server: McpServer, db: Banktiv
       annotations: { readOnlyHint: true },
     },
     async ({ schedule_id }) => {
-      const schedule = db.scheduledTransactions.getById(schedule_id);
+      const schedule = client.scheduledTransactions.get(schedule_id);
       if (!schedule) {
         return errorResponse(`Scheduled transaction not found: ${schedule_id}`);
       }
@@ -47,22 +50,46 @@ export function registerScheduledTransactionTools(server: McpServer, db: Banktiv
       description: "Create a new scheduled/recurring transaction",
       inputSchema: {
         template_id: z.number().describe("The transaction template ID to use"),
-        start_date: z.string().describe("Start date in ISO format (YYYY-MM-DD)"),
-        account_id: z.string().optional().describe("Account UUID for the transaction"),
-        repeat_interval: z.number().optional().default(1).describe("Repeat interval (1=daily, 7=weekly, 30=monthly)"),
-        repeat_multiplier: z.number().optional().default(1).describe("Multiplier for repeat interval"),
-        reminder_days: z.number().optional().default(7).describe("Days in advance to show reminder"),
+        start_date: z
+          .string()
+          .describe("Start date in ISO format (YYYY-MM-DD)"),
+        account_id: z
+          .string()
+          .optional()
+          .describe("Account UUID for the transaction"),
+        repeat_interval: z
+          .number()
+          .optional()
+          .default(1)
+          .describe("Repeat interval (1=daily, 7=weekly, 30=monthly)"),
+        repeat_multiplier: z
+          .number()
+          .optional()
+          .default(1)
+          .describe("Multiplier for repeat interval"),
+        reminder_days: z
+          .number()
+          .optional()
+          .default(7)
+          .describe("Days in advance to show reminder"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
-    async ({ template_id, start_date, account_id, repeat_interval, repeat_multiplier, reminder_days }) => {
+    async ({
+      template_id,
+      start_date,
+      account_id,
+      repeat_interval,
+      repeat_multiplier,
+      reminder_days,
+    }) => {
       // Verify template exists
-      const template = db.templates.getById(template_id);
+      const template = client.templates.get(template_id);
       if (!template) {
         return errorResponse(`Template not found: ${template_id}`);
       }
 
-      const scheduleId = db.scheduledTransactions.create({
+      const scheduleId = client.scheduledTransactions.create({
         templateId: template_id,
         startDate: start_date,
         accountId: account_id,
@@ -71,8 +98,11 @@ export function registerScheduledTransactionTools(server: McpServer, db: Banktiv
         reminderDays: reminder_days,
       });
 
-      const schedule = db.scheduledTransactions.getById(scheduleId);
-      return successResponse("Scheduled transaction created successfully", { scheduleId, schedule });
+      const schedule = client.scheduledTransactions.get(scheduleId);
+      return successResponse("Scheduled transaction created successfully", {
+        scheduleId,
+        schedule,
+      });
     }
   );
 
@@ -82,18 +112,37 @@ export function registerScheduledTransactionTools(server: McpServer, db: Banktiv
       title: "Update Scheduled Transaction",
       description: "Update an existing scheduled transaction",
       inputSchema: {
-        schedule_id: z.number().describe("The scheduled transaction ID to update"),
-        start_date: z.string().optional().describe("New start date in ISO format"),
-        next_date: z.string().optional().describe("New next occurrence date in ISO format"),
+        schedule_id: z
+          .number()
+          .describe("The scheduled transaction ID to update"),
+        start_date: z
+          .string()
+          .optional()
+          .describe("New start date in ISO format"),
+        next_date: z
+          .string()
+          .optional()
+          .describe("New next occurrence date in ISO format"),
         repeat_interval: z.number().optional().describe("New repeat interval"),
-        repeat_multiplier: z.number().optional().describe("New repeat multiplier"),
+        repeat_multiplier: z
+          .number()
+          .optional()
+          .describe("New repeat multiplier"),
         account_id: z.string().optional().describe("New account UUID"),
         reminder_days: z.number().optional().describe("New reminder days"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
-    async ({ schedule_id, start_date, next_date, repeat_interval, repeat_multiplier, account_id, reminder_days }) => {
-      const success = db.scheduledTransactions.update(schedule_id, {
+    async ({
+      schedule_id,
+      start_date,
+      next_date,
+      repeat_interval,
+      repeat_multiplier,
+      account_id,
+      reminder_days,
+    }) => {
+      const success = client.scheduledTransactions.update(schedule_id, {
         startDate: start_date,
         nextDate: next_date,
         repeatInterval: repeat_interval,
@@ -103,11 +152,15 @@ export function registerScheduledTransactionTools(server: McpServer, db: Banktiv
       });
 
       if (!success) {
-        return errorResponse("Scheduled transaction not found or no updates provided");
+        return errorResponse(
+          "Scheduled transaction not found or no updates provided"
+        );
       }
 
-      const schedule = db.scheduledTransactions.getById(schedule_id);
-      return successResponse("Scheduled transaction updated successfully", { schedule });
+      const schedule = client.scheduledTransactions.get(schedule_id);
+      return successResponse("Scheduled transaction updated successfully", {
+        schedule,
+      });
     }
   );
 
@@ -117,18 +170,22 @@ export function registerScheduledTransactionTools(server: McpServer, db: Banktiv
       title: "Delete Scheduled Transaction",
       description: "Delete a scheduled transaction",
       inputSchema: {
-        schedule_id: z.number().describe("The scheduled transaction ID to delete"),
+        schedule_id: z
+          .number()
+          .describe("The scheduled transaction ID to delete"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true },
     },
     async ({ schedule_id }) => {
-      const schedule = db.scheduledTransactions.getById(schedule_id);
+      const schedule = client.scheduledTransactions.get(schedule_id);
       if (!schedule) {
         return errorResponse(`Scheduled transaction not found: ${schedule_id}`);
       }
 
-      db.scheduledTransactions.delete(schedule_id);
-      return successResponse("Scheduled transaction deleted successfully", { deletedSchedule: schedule });
+      client.scheduledTransactions.delete(schedule_id);
+      return successResponse("Scheduled transaction deleted successfully", {
+        deletedSchedule: schedule,
+      });
     }
   );
 }

@@ -5,17 +5,17 @@ import {
   UpdateScheduledTransactionInput,
 } from "../types.js";
 import { Z_ENT } from "../constants.js";
-import { nowAsCoreData, coreDataToISO, isoToCoreData } from "../../utils/date.js";
-import { generateUUID } from "../../utils/uuid.js";
+import { nowAsCoreData, coreDataToISO, isoToCoreData } from "../utils/date.js";
+import { generateUUID } from "../utils/uuid.js";
 
 /**
  * Repository for scheduled transaction operations
  */
 export class ScheduledTransactionRepository extends BaseRepository {
   /**
-   * Get all scheduled transactions
+   * List all scheduled transactions
    */
-  getAll(): ScheduledTransaction[] {
+  list(): ScheduledTransaction[] {
     const sql = `
       SELECT
         ts.Z_PK as id,
@@ -55,7 +55,7 @@ export class ScheduledTransactionRepository extends BaseRepository {
   /**
    * Get scheduled transaction by ID
    */
-  getById(scheduleId: number): ScheduledTransaction | null {
+  get(scheduleId: number): ScheduledTransaction | null {
     const sql = `
       SELECT
         ts.Z_PK as id,
@@ -74,19 +74,21 @@ export class ScheduledTransactionRepository extends BaseRepository {
       WHERE ts.Z_PK = ? AND ts.Z_ENT = ?
     `;
 
-    const row = this.db.prepare(sql).get(scheduleId, Z_ENT.SCHEDULED_TEMPLATE_SELECTOR) as {
-      id: number;
-      templateId: number;
-      templateTitle: string;
-      amount: number;
-      startDate: number | null;
-      nextDate: number | null;
-      repeatInterval: number | null;
-      repeatMultiplier: number | null;
-      accountId: string | null;
-      reminderDays: number | null;
-      recurringTransactionId: number | null;
-    } | undefined;
+    const row = this.db.prepare(sql).get(scheduleId, Z_ENT.SCHEDULED_TEMPLATE_SELECTOR) as
+      | {
+          id: number;
+          templateId: number;
+          templateTitle: string;
+          amount: number;
+          startDate: number | null;
+          nextDate: number | null;
+          repeatInterval: number | null;
+          repeatMultiplier: number | null;
+          accountId: string | null;
+          reminderDays: number | null;
+          recurringTransactionId: number | null;
+        }
+      | undefined;
 
     if (!row) return null;
 
@@ -170,9 +172,15 @@ export class ScheduledTransactionRepository extends BaseRepository {
       columnMap.nextDate = "ZPEXTERNALCALENDARNEXTDATE";
     }
 
-    const changes = this.executeUpdate("ZTEMPLATESELECTOR", scheduleId, processedUpdates, columnMap, {
-      additionalWhere: `Z_ENT = ${Z_ENT.SCHEDULED_TEMPLATE_SELECTOR}`,
-    });
+    const changes = this.executeUpdate(
+      "ZTEMPLATESELECTOR",
+      scheduleId,
+      processedUpdates,
+      columnMap,
+      {
+        additionalWhere: `Z_ENT = ${Z_ENT.SCHEDULED_TEMPLATE_SELECTOR}`,
+      }
+    );
 
     return changes > 0;
   }
@@ -181,17 +189,25 @@ export class ScheduledTransactionRepository extends BaseRepository {
    * Delete a scheduled transaction
    */
   delete(scheduleId: number): boolean {
-    const schedule = this.db.prepare(
-      `SELECT ZPRECURRINGTRANSACTION as recurringId FROM ZTEMPLATESELECTOR WHERE Z_PK = ? AND Z_ENT = ?`
-    ).get(scheduleId, Z_ENT.SCHEDULED_TEMPLATE_SELECTOR) as { recurringId: number | null } | undefined;
+    const schedule = this.db
+      .prepare(
+        `SELECT ZPRECURRINGTRANSACTION as recurringId FROM ZTEMPLATESELECTOR WHERE Z_PK = ? AND Z_ENT = ?`
+      )
+      .get(scheduleId, Z_ENT.SCHEDULED_TEMPLATE_SELECTOR) as
+      | { recurringId: number | null }
+      | undefined;
 
     if (!schedule) return false;
 
     this.runTransaction(() => {
-      this.db.prepare(`DELETE FROM ZTEMPLATESELECTOR WHERE Z_PK = ?`).run(scheduleId);
+      this.db
+        .prepare(`DELETE FROM ZTEMPLATESELECTOR WHERE Z_PK = ?`)
+        .run(scheduleId);
 
       if (schedule.recurringId) {
-        this.db.prepare(`DELETE FROM ZRECURRINGTRANSACTION WHERE Z_PK = ?`).run(schedule.recurringId);
+        this.db
+          .prepare(`DELETE FROM ZRECURRINGTRANSACTION WHERE Z_PK = ?`)
+          .run(schedule.recurringId);
       }
     });
 

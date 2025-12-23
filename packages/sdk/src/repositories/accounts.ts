@@ -1,8 +1,15 @@
 import { BaseRepository } from "./base.js";
-import { Account, CreateAccountInput, CategorySpending, NetWorth, DateRangeFilter } from "../types.js";
+import {
+  Account,
+  CreateAccountInput,
+  CategorySpending,
+  NetWorth,
+  DateRangeFilter,
+  ListAccountsOptions,
+} from "../types.js";
 import { Z_ENT, ACCOUNT_CLASS, getAccountTypeName } from "../constants.js";
-import { nowAsCoreData, isoToCoreData } from "../../utils/date.js";
-import { generateUUID } from "../../utils/uuid.js";
+import { nowAsCoreData, isoToCoreData } from "../utils/date.js";
+import { generateUUID } from "../utils/uuid.js";
 import { DatabaseConnection } from "../connection.js";
 
 /**
@@ -17,9 +24,11 @@ export class AccountRepository extends BaseRepository {
   }
 
   /**
-   * Get all accounts
+   * List all accounts
    */
-  getAll(includeHidden = false): Account[] {
+  list(options: ListAccountsOptions = {}): Account[] {
+    const { includeHidden = false } = options;
+
     const sql = `
       SELECT
         a.Z_PK as id,
@@ -57,7 +66,7 @@ export class AccountRepository extends BaseRepository {
   /**
    * Get account by ID
    */
-  getById(accountId: number): Account | null {
+  get(accountId: number): Account | null {
     const sql = `
       SELECT
         a.Z_PK as id,
@@ -97,11 +106,15 @@ export class AccountRepository extends BaseRepository {
    * Find account by name (case-insensitive)
    */
   findByName(name: string): Account | null {
-    const accounts = this.getAll(true);
+    const accounts = this.list({ includeHidden: true });
     const lowerName = name.toLowerCase();
-    return accounts.find(
-      (a) => a.name.toLowerCase() === lowerName || a.fullName.toLowerCase() === lowerName
-    ) ?? null;
+    return (
+      accounts.find(
+        (a) =>
+          a.name.toLowerCase() === lowerName ||
+          a.fullName.toLowerCase() === lowerName
+      ) ?? null
+    );
   }
 
   /**
@@ -133,8 +146,9 @@ export class AccountRepository extends BaseRepository {
     }
 
     const isDebit = input.accountClass !== ACCOUNT_CLASS.CREDIT_CARD;
-    const isCategory = input.accountClass === ACCOUNT_CLASS.INCOME ||
-                       input.accountClass === ACCOUNT_CLASS.EXPENSE;
+    const isCategory =
+      input.accountClass === ACCOUNT_CLASS.INCOME ||
+      input.accountClass === ACCOUNT_CLASS.EXPENSE;
     const entityType = isCategory ? Z_ENT.CATEGORY : Z_ENT.PRIMARY_ACCOUNT;
 
     const sql = `
@@ -164,8 +178,12 @@ export class AccountRepository extends BaseRepository {
   /**
    * Get spending or income by category
    */
-  getCategoryAnalysis(type: "income" | "expense", filter: DateRangeFilter = {}): CategorySpending[] {
-    const accountClass = type === "income" ? ACCOUNT_CLASS.INCOME : ACCOUNT_CLASS.EXPENSE;
+  getCategoryAnalysis(
+    type: "income" | "expense",
+    filter: DateRangeFilter = {}
+  ): CategorySpending[] {
+    const accountClass =
+      type === "income" ? ACCOUNT_CLASS.INCOME : ACCOUNT_CLASS.EXPENSE;
     const conditions: string[] = [`a.ZPACCOUNTCLASS = ${accountClass}`];
     const params: number[] = [];
 
@@ -214,7 +232,9 @@ export class AccountRepository extends BaseRepository {
     `;
 
     const assets = (this.db.prepare(assetsSql).get() as { total: number }).total;
-    const liabilities = (this.db.prepare(liabilitiesSql).get() as { total: number }).total;
+    const liabilities = (
+      this.db.prepare(liabilitiesSql).get() as { total: number }
+    ).total;
 
     return {
       assets,

@@ -1,9 +1,8 @@
-import Database from "better-sqlite3";
 import { BaseRepository } from "./base.js";
 import { LineItem, UpdateLineItemInput } from "../types.js";
 import { Z_ENT } from "../constants.js";
-import { nowAsCoreData } from "../../utils/date.js";
-import { generateUUID } from "../../utils/uuid.js";
+import { nowAsCoreData } from "../utils/date.js";
+import { generateUUID } from "../utils/uuid.js";
 
 /**
  * Repository for line item operations
@@ -49,7 +48,7 @@ export class LineItemRepository extends BaseRepository {
   /**
    * Get a line item by ID
    */
-  getById(lineItemId: number): LineItem | null {
+  get(lineItemId: number): LineItem | null {
     const sql = `
       SELECT
         li.Z_PK as id,
@@ -63,14 +62,16 @@ export class LineItemRepository extends BaseRepository {
       WHERE li.Z_PK = ?
     `;
 
-    const row = this.db.prepare(sql).get(lineItemId) as {
-      id: number;
-      accountId: number;
-      accountName: string;
-      amount: number;
-      memo: string | null;
-      runningBalance: number | null;
-    } | undefined;
+    const row = this.db.prepare(sql).get(lineItemId) as
+      | {
+          id: number;
+          accountId: number;
+          accountName: string;
+          amount: number;
+          memo: string | null;
+          runningBalance: number | null;
+        }
+      | undefined;
 
     if (!row) return null;
 
@@ -89,7 +90,9 @@ export class LineItemRepository extends BaseRepository {
    */
   getAccountId(lineItemId: number): number | null {
     const sql = `SELECT ZPACCOUNT as accountId FROM ZLINEITEM WHERE Z_PK = ?`;
-    const row = this.db.prepare(sql).get(lineItemId) as { accountId: number } | undefined;
+    const row = this.db.prepare(sql).get(lineItemId) as
+      | { accountId: number }
+      | undefined;
     return row?.accountId ?? null;
   }
 
@@ -98,7 +101,9 @@ export class LineItemRepository extends BaseRepository {
    */
   getAccountIdsForTransaction(transactionId: number): number[] {
     const sql = `SELECT DISTINCT ZPACCOUNT as accountId FROM ZLINEITEM WHERE ZPTRANSACTION = ?`;
-    const rows = this.db.prepare(sql).all(transactionId) as Array<{ accountId: number }>;
+    const rows = this.db.prepare(sql).all(transactionId) as Array<{
+      accountId: number;
+    }>;
     return rows.map((r) => r.accountId);
   }
 
@@ -122,15 +127,17 @@ export class LineItemRepository extends BaseRepository {
       ) VALUES (?, 0, ?, ?, ?, ?, 1.0, 0, ?, ?, 0)
     `;
 
-    const result = this.db.prepare(sql).run(
-      Z_ENT.LINEITEM,
-      accountId,
-      transactionId,
-      now,
-      amount,
-      memo ?? null,
-      uuid
-    );
+    const result = this.db
+      .prepare(sql)
+      .run(
+        Z_ENT.LINEITEM,
+        accountId,
+        transactionId,
+        now,
+        amount,
+        memo ?? null,
+        uuid
+      );
 
     return result.lastInsertRowid as number;
   }
@@ -169,14 +176,20 @@ export class LineItemRepository extends BaseRepository {
    * Delete a line item
    * @returns Account ID for running balance recalculation, or null if not found
    */
-  delete(lineItemId: number): { accountId: number; transactionId: number } | null {
+  delete(
+    lineItemId: number
+  ): { accountId: number; transactionId: number } | null {
     const sql = `SELECT ZPACCOUNT as accountId, ZPTRANSACTION as transactionId FROM ZLINEITEM WHERE Z_PK = ?`;
-    const lineItem = this.db.prepare(sql).get(lineItemId) as { accountId: number; transactionId: number } | undefined;
+    const lineItem = this.db.prepare(sql).get(lineItemId) as
+      | { accountId: number; transactionId: number }
+      | undefined;
 
     if (!lineItem) return null;
 
     this.runTransaction(() => {
-      this.db.prepare(`DELETE FROM Z_19PTAGS WHERE Z_19PLINEITEMS = ?`).run(lineItemId);
+      this.db
+        .prepare(`DELETE FROM Z_19PTAGS WHERE Z_19PLINEITEMS = ?`)
+        .run(lineItemId);
       this.db.prepare(`DELETE FROM ZLINEITEM WHERE Z_PK = ?`).run(lineItemId);
     });
 
@@ -187,13 +200,19 @@ export class LineItemRepository extends BaseRepository {
    * Delete all line items for a transaction (including tag associations)
    */
   deleteForTransaction(transactionId: number): void {
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       DELETE FROM Z_19PTAGS WHERE Z_19PLINEITEMS IN (
         SELECT Z_PK FROM ZLINEITEM WHERE ZPTRANSACTION = ?
       )
-    `).run(transactionId);
+    `
+      )
+      .run(transactionId);
 
-    this.db.prepare(`DELETE FROM ZLINEITEM WHERE ZPTRANSACTION = ?`).run(transactionId);
+    this.db
+      .prepare(`DELETE FROM ZLINEITEM WHERE ZPTRANSACTION = ?`)
+      .run(transactionId);
   }
 
   /**

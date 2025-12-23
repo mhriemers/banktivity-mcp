@@ -1,4 +1,4 @@
-import { BanktivityDatabase } from "../database/index.js";
+import { BanktivityClient } from "banktivity-sdk";
 
 /**
  * Tool response types - uses index signature for MCP SDK compatibility
@@ -31,7 +31,10 @@ export function errorResponse(message: string): ToolResponse {
 /**
  * Create a success message response with optional data
  */
-export function successResponse(message: string, data?: Record<string, unknown>): ToolResponse {
+export function successResponse(
+  message: string,
+  data?: Record<string, unknown>
+): ToolResponse {
   return jsonResponse({
     message,
     ...data,
@@ -53,7 +56,7 @@ export function formatCurrency(amount: number, currency = "EUR"): string {
  * @returns Account ID or null if not found
  */
 export function resolveAccountId(
-  db: BanktivityDatabase,
+  client: BanktivityClient,
   accountId?: number,
   accountName?: string
 ): number | null {
@@ -62,7 +65,7 @@ export function resolveAccountId(
   }
 
   if (accountName) {
-    const account = db.accounts.findByName(accountName);
+    const account = client.accounts.findByName(accountName);
     return account?.id ?? null;
   }
 
@@ -74,11 +77,11 @@ export function resolveAccountId(
  * @returns Account ID or error response
  */
 export function resolveAccountIdOrError(
-  db: BanktivityDatabase,
+  client: BanktivityClient,
   accountId?: number,
   accountName?: string
 ): number | ToolResponse {
-  const id = resolveAccountId(db, accountId, accountName);
+  const id = resolveAccountId(client, accountId, accountName);
 
   if (id === null) {
     if (accountName) {
@@ -94,5 +97,10 @@ export function resolveAccountIdOrError(
  * Helper to check if a value is an error response
  */
 export function isErrorResponse(value: unknown): value is ToolResponse {
-  return typeof value === "object" && value !== null && "isError" in value && (value as ToolResponse).isError === true;
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "isError" in value &&
+    (value as ToolResponse).isError === true
+  );
 }

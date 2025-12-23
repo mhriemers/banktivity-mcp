@@ -1,8 +1,13 @@
 import { BaseRepository } from "./base.js";
-import { Transaction, CreateTransactionInput, UpdateTransactionInput, TransactionFilter } from "../types.js";
+import {
+  Transaction,
+  CreateTransactionInput,
+  UpdateTransactionInput,
+  TransactionFilter,
+} from "../types.js";
 import { Z_ENT } from "../constants.js";
-import { nowAsCoreData, coreDataToISO, isoToCoreData } from "../../utils/date.js";
-import { generateUUID } from "../../utils/uuid.js";
+import { nowAsCoreData, coreDataToISO, isoToCoreData } from "../utils/date.js";
+import { generateUUID } from "../utils/uuid.js";
 import { DatabaseConnection } from "../connection.js";
 import { LineItemRepository } from "./line-items.js";
 
@@ -20,9 +25,9 @@ export class TransactionRepository extends BaseRepository {
   }
 
   /**
-   * Get transactions with optional filtering
+   * List transactions with optional filtering
    */
-  getAll(filter: TransactionFilter = {}): Transaction[] {
+  list(filter: TransactionFilter = {}): Transaction[] {
     const conditions: string[] = [];
     const params: (number | string)[] = [];
 
@@ -41,7 +46,8 @@ export class TransactionRepository extends BaseRepository {
       params.push(isoToCoreData(filter.endDate));
     }
 
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
     const limitClause = filter.limit ? `LIMIT ${filter.limit}` : "";
     const offsetClause = filter.offset ? `OFFSET ${filter.offset}` : "";
 
@@ -97,7 +103,9 @@ export class TransactionRepository extends BaseRepository {
     `;
 
     const searchPattern = `%${query}%`;
-    const rows = this.db.prepare(sql).all(searchPattern, searchPattern, limit) as Array<{
+    const rows = this.db
+      .prepare(sql)
+      .all(searchPattern, searchPattern, limit) as Array<{
       id: number;
       date: number;
       title: string;
@@ -113,7 +121,7 @@ export class TransactionRepository extends BaseRepository {
   /**
    * Get transaction by ID
    */
-  getById(transactionId: number): Transaction | null {
+  get(transactionId: number): Transaction | null {
     const sql = `
       SELECT
         t.Z_PK as id,
@@ -128,15 +136,17 @@ export class TransactionRepository extends BaseRepository {
       WHERE t.Z_PK = ?
     `;
 
-    const row = this.db.prepare(sql).get(transactionId) as {
-      id: number;
-      date: number;
-      title: string;
-      note: string | null;
-      cleared: number;
-      voided: number;
-      transactionType: string | null;
-    } | undefined;
+    const row = this.db.prepare(sql).get(transactionId) as
+      | {
+          id: number;
+          date: number;
+          title: string;
+          note: string | null;
+          cleared: number;
+          voided: number;
+          transactionType: string | null;
+        }
+      | undefined;
 
     if (!row) return null;
 
@@ -146,7 +156,7 @@ export class TransactionRepository extends BaseRepository {
   /**
    * Get total transaction count
    */
-  getCount(): number {
+  count(): number {
     const sql = `SELECT COUNT(*) as count FROM ZTRANSACTION`;
     return (this.db.prepare(sql).get() as { count: number }).count;
   }
@@ -154,7 +164,9 @@ export class TransactionRepository extends BaseRepository {
   /**
    * Create a new transaction with line items
    */
-  create(input: CreateTransactionInput): { transactionId: number; lineItemIds: number[] } {
+  create(
+    input: CreateTransactionInput
+  ): { transactionId: number; lineItemIds: number[] } {
     const now = nowAsCoreData();
     const transactionDate = isoToCoreData(input.date);
     const transactionUUID = generateUUID();
@@ -229,10 +241,16 @@ export class TransactionRepository extends BaseRepository {
       columnMap.cleared = "ZPCLEARED";
     }
 
-    const changes = this.executeUpdate("ZTRANSACTION", transactionId, processedUpdates, columnMap);
+    const changes = this.executeUpdate(
+      "ZTRANSACTION",
+      transactionId,
+      processedUpdates,
+      columnMap
+    );
 
     if (changes > 0 && updates.date !== undefined) {
-      const accountIds = this.lineItems.getAccountIdsForTransaction(transactionId);
+      const accountIds =
+        this.lineItems.getAccountIdsForTransaction(transactionId);
       for (const accountId of accountIds) {
         this.lineItems.recalculateRunningBalances(accountId);
       }
@@ -245,11 +263,14 @@ export class TransactionRepository extends BaseRepository {
    * Delete a transaction and its line items
    */
   delete(transactionId: number): boolean {
-    const affectedAccounts = this.lineItems.getAccountIdsForTransaction(transactionId);
+    const affectedAccounts =
+      this.lineItems.getAccountIdsForTransaction(transactionId);
 
     this.runTransaction(() => {
       this.lineItems.deleteForTransaction(transactionId);
-      this.db.prepare(`DELETE FROM ZTRANSACTION WHERE Z_PK = ?`).run(transactionId);
+      this.db
+        .prepare(`DELETE FROM ZTRANSACTION WHERE Z_PK = ?`)
+        .run(transactionId);
     });
 
     for (const accountId of affectedAccounts) {

@@ -1,0 +1,44 @@
+{
+  "name": "banktivity-sdk",
+  "version": "1.0.0",
+  "description": "TypeScript SDK for Banktivity personal finance data",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "banktivity",
+    "finance",
+    "personal-finance",
+    "sdk"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^11.6.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.2"
+  },
+  "peerDependencies": {
+    "@types/better-sqlite3": "^7.6.12"
+  },
+  "peerDependenciesMeta": {
+    "@types/better-sqlite3": {
+      "optional": true
+    }
+  }
+}

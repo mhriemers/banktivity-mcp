@@ -1,5 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { BanktivityDatabase } from "../database/index.js";
+import { BanktivityClient } from "banktivity-sdk";
 
 import { registerAccountTools } from "./accounts.js";
 import { registerTransactionTools } from "./transactions.js";
@@ -12,14 +12,17 @@ import { registerScheduledTransactionTools } from "./scheduled-transactions.js";
 /**
  * Register all tools with the MCP server
  */
-export function registerAllTools(server: McpServer, db: BanktivityDatabase): void {
-  registerAccountTools(server, db);
-  registerTransactionTools(server, db);
-  registerLineItemTools(server, db);
-  registerTagTools(server, db);
-  registerTemplateTools(server, db);
-  registerImportRuleTools(server, db);
-  registerScheduledTransactionTools(server, db);
+export function registerAllTools(
+  server: McpServer,
+  client: BanktivityClient
+): void {
+  registerAccountTools(server, client);
+  registerTransactionTools(server, client);
+  registerLineItemTools(server, client);
+  registerTagTools(server, client);
+  registerTemplateTools(server, client);
+  registerImportRuleTools(server, client);
+  registerScheduledTransactionTools(server, client);
 }
 
 // Re-export for convenience

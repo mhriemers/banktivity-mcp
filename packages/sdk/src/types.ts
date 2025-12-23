@@ -190,3 +190,9 @@ export interface TransactionFilter extends DateRangeFilter {
   limit?: number;
   offset?: number;
 }
+
+// Options types for SDK methods
+
+export interface ListAccountsOptions {
+  includeHidden?: boolean;
+}

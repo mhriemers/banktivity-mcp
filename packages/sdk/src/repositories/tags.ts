@@ -1,19 +1,28 @@
 import { BaseRepository } from "./base.js";
 import { Tag } from "../types.js";
 import { Z_ENT } from "../constants.js";
-import { nowAsCoreData } from "../../utils/date.js";
-import { generateUUID } from "../../utils/uuid.js";
+import { nowAsCoreData } from "../utils/date.js";
+import { generateUUID } from "../utils/uuid.js";
 
 /**
  * Repository for tag operations
  */
 export class TagRepository extends BaseRepository {
   /**
-   * Get all tags
+   * List all tags
    */
-  getAll(): Tag[] {
+  list(): Tag[] {
     const sql = `SELECT Z_PK as id, ZPNAME as name FROM ZTAG ORDER BY ZPNAME`;
     return this.db.prepare(sql).all() as Tag[];
+  }
+
+  /**
+   * Get tag by ID
+   */
+  get(tagId: number): Tag | null {
+    const sql = `SELECT Z_PK as id, ZPNAME as name FROM ZTAG WHERE Z_PK = ?`;
+    const row = this.db.prepare(sql).get(tagId) as Tag | undefined;
+    return row ?? null;
   }
 
   /**
@@ -32,9 +41,9 @@ export class TagRepository extends BaseRepository {
   create(name: string): number {
     const canonicalName = name.toUpperCase().trim();
 
-    const existing = this.db.prepare(
-      `SELECT Z_PK as id FROM ZTAG WHERE ZPCANONICALNAME = ?`
-    ).get(canonicalName) as { id: number } | undefined;
+    const existing = this.db
+      .prepare(`SELECT Z_PK as id FROM ZTAG WHERE ZPCANONICALNAME = ?`)
+      .get(canonicalName) as { id: number } | undefined;
 
     if (existing) {
       return existing.id;
@@ -50,14 +59,9 @@ export class TagRepository extends BaseRepository {
       ) VALUES (?, 0, ?, ?, ?, ?, ?)
     `;
 
-    const result = this.db.prepare(sql).run(
-      Z_ENT.TAG,
-      now,
-      now,
-      name.trim(),
-      canonicalName,
-      uuid
-    );
+    const result = this.db
+      .prepare(sql)
+      .run(Z_ENT.TAG, now, now, name.trim(), canonicalName, uuid);
 
     return result.lastInsertRowid as number;
   }
@@ -66,9 +70,11 @@ export class TagRepository extends BaseRepository {
    * Add a tag to a line item
    */
   addToLineItem(lineItemId: number, tagId: number): boolean {
-    const existing = this.db.prepare(
-      `SELECT 1 FROM Z_19PTAGS WHERE Z_19PLINEITEMS = ? AND Z_47PTAGS = ?`
-    ).get(lineItemId, tagId);
+    const existing = this.db
+      .prepare(
+        `SELECT 1 FROM Z_19PTAGS WHERE Z_19PLINEITEMS = ? AND Z_47PTAGS = ?`
+      )
+      .get(lineItemId, tagId);
 
     if (existing) return false;
 
@@ -90,9 +96,9 @@ export class TagRepository extends BaseRepository {
    * Tag all line items in a transaction
    */
   tagTransaction(transactionId: number, tagId: number): number {
-    const lineItems = this.db.prepare(
-      `SELECT Z_PK as id FROM ZLINEITEM WHERE ZPTRANSACTION = ?`
-    ).all(transactionId) as Array<{ id: number }>;
+    const lineItems = this.db
+      .prepare(`SELECT Z_PK as id FROM ZLINEITEM WHERE ZPTRANSACTION = ?`)
+      .all(transactionId) as Array<{ id: number }>;
 
     let added = 0;
     for (const item of lineItems) {
@@ -107,9 +113,9 @@ export class TagRepository extends BaseRepository {
    * Remove a tag from all line items in a transaction
    */
   untagTransaction(transactionId: number, tagId: number): number {
-    const lineItems = this.db.prepare(
-      `SELECT Z_PK as id FROM ZLINEITEM WHERE ZPTRANSACTION = ?`
-    ).all(transactionId) as Array<{ id: number }>;
+    const lineItems = this.db
+      .prepare(`SELECT Z_PK as id FROM ZLINEITEM WHERE ZPTRANSACTION = ?`)
+      .all(transactionId) as Array<{ id: number }>;
 
     let removed = 0;
     for (const item of lineItems) {

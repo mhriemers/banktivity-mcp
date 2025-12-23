@@ -1,9 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { BanktivityDatabase } from "../database/index.js";
+import { BanktivityClient } from "banktivity-sdk";
 import {
   jsonResponse,
-  errorResponse,
   successResponse,
   formatCurrency,
   resolveAccountIdOrError,
@@ -13,20 +12,32 @@ import {
 /**
  * Register account-related tools
  */
-export function registerAccountTools(server: McpServer, db: BanktivityDatabase): void {
+export function registerAccountTools(
+  server: McpServer,
+  client: BanktivityClient
+): void {
   server.registerTool(
     "list_accounts",
     {
       title: "List Accounts",
-      description: "List all accounts in Banktivity with their types and current balances",
+      description:
+        "List all accounts in Banktivity with their types and current balances",
       inputSchema: {
-        include_hidden: z.boolean().optional().default(false).describe("Include hidden accounts"),
-        include_categories: z.boolean().optional().default(false).describe("Include income/expense categories"),
+        include_hidden: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Include hidden accounts"),
+        include_categories: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Include income/expense categories"),
       },
       annotations: { readOnlyHint: true },
     },
     async ({ include_hidden, include_categories }) => {
-      let accounts = db.accounts.getAll(include_hidden);
+      let accounts = client.accounts.list({ includeHidden: include_hidden });
 
       if (!include_categories) {
         accounts = accounts.filter((a) => a.accountClass < 6000);
@@ -34,8 +45,11 @@ export function registerAccountTools(server: McpServer, db: BanktivityDatabase):
 
       const accountsWithBalances = accounts.map((account) => ({
         ...account,
-        balance: db.accounts.getBalance(account.id),
-        formattedBalance: formatCurrency(db.accounts.getBalance(account.id), account.currency ?? "EUR"),
+        balance: client.accounts.getBalance(account.id),
+        formattedBalance: formatCurrency(
+          client.accounts.getBalance(account.id),
+          account.currency ?? "EUR"
+        ),
       }));
 
       return jsonResponse(accountsWithBalances);
@@ -49,16 +63,19 @@ export function registerAccountTools(server: McpServer, db: BanktivityDatabase):
       description: "Get the current balance for a specific account",
       inputSchema: {
         account_id: z.number().optional().describe("The account ID"),
-        account_name: z.string().optional().describe("The account name (alternative to account_id)"),
+        account_name: z
+          .string()
+          .optional()
+          .describe("The account name (alternative to account_id)"),
       },
       annotations: { readOnlyHint: true },
     },
     async ({ account_id, account_name }) => {
-      const accountId = resolveAccountIdOrError(db, account_id, account_name);
+      const accountId = resolveAccountIdOrError(client, account_id, account_name);
       if (isErrorResponse(accountId)) return accountId;
 
-      const balance = db.accounts.getBalance(accountId);
-      const account = db.accounts.getById(accountId);
+      const balance = client.accounts.getBalance(accountId);
+      const account = client.accounts.get(accountId);
 
       return jsonResponse({
         accountId,
@@ -69,19 +86,38 @@ export function registerAccountTools(server: McpServer, db: BanktivityDatabase):
     }
   );
 
-  const accountTypeEnum = z.enum(["checking", "savings", "credit_card", "income", "expense"]);
+  const accountTypeEnum = z.enum([
+    "checking",
+    "savings",
+    "credit_card",
+    "income",
+    "expense",
+  ]);
 
   server.registerTool(
     "create_account",
     {
       title: "Create Account",
-      description: "Create a new account (checking, savings, credit card, or category)",
+      description:
+        "Create a new account (checking, savings, credit card, or category)",
       inputSchema: {
         name: z.string().describe("The account name"),
-        full_name: z.string().optional().describe("The full account name (defaults to name)"),
+        full_name: z
+          .string()
+          .optional()
+          .describe("The full account name (defaults to name)"),
         account_type: accountTypeEnum.describe("The type of account to create"),
-        currency_code: z.string().optional().describe("Currency code (e.g., 'EUR', 'USD'). Defaults to database default."),
-        hidden: z.boolean().optional().default(false).describe("Whether the account should be hidden"),
+        currency_code: z
+          .string()
+          .optional()
+          .describe(
+            "Currency code (e.g., 'EUR', 'USD'). Defaults to database default."
+          ),
+        hidden: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Whether the account should be hidden"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
@@ -94,7 +130,7 @@ export function registerAccountTools(server: McpServer, db: BanktivityDatabase):
         expense: 7000,
       };
 
-      const accountId = db.accounts.create({
+      const accountId = client.accounts.create({
         name,
         fullName: full_name,
         accountClass: accountClassMap[account_type],
@@ -102,9 +138,12 @@ export function registerAccountTools(server: McpServer, db: BanktivityDatabase):
         hidden,
       });
 
-      const account = db.accounts.getById(accountId);
+      const account = client.accounts.get(accountId);
 
-      return successResponse("Account created successfully", { accountId, account });
+      return successResponse("Account created successfully", {
+        accountId,
+        account,
+      });
     }
   );
 
@@ -114,13 +153,19 @@ export function registerAccountTools(server: McpServer, db: BanktivityDatabase):
       title: "Get Spending by Category",
       description: "Get spending breakdown by expense category",
       inputSchema: {
-        start_date: z.string().optional().describe("Start date in ISO format (YYYY-MM-DD)"),
-        end_date: z.string().optional().describe("End date in ISO format (YYYY-MM-DD)"),
+        start_date: z
+          .string()
+          .optional()
+          .describe("Start date in ISO format (YYYY-MM-DD)"),
+        end_date: z
+          .string()
+          .optional()
+          .describe("End date in ISO format (YYYY-MM-DD)"),
       },
       annotations: { readOnlyHint: true },
     },
     async ({ start_date, end_date }) => {
-      const spending = db.accounts.getCategoryAnalysis("expense", {
+      const spending = client.accounts.getCategoryAnalysis("expense", {
         startDate: start_date,
         endDate: end_date,
       });
@@ -140,13 +185,19 @@ export function registerAccountTools(server: McpServer, db: BanktivityDatabase):
       title: "Get Income by Category",
       description: "Get income breakdown by income category",
       inputSchema: {
-        start_date: z.string().optional().describe("Start date in ISO format (YYYY-MM-DD)"),
-        end_date: z.string().optional().describe("End date in ISO format (YYYY-MM-DD)"),
+        start_date: z
+          .string()
+          .optional()
+          .describe("Start date in ISO format (YYYY-MM-DD)"),
+        end_date: z
+          .string()
+          .optional()
+          .describe("End date in ISO format (YYYY-MM-DD)"),
       },
       annotations: { readOnlyHint: true },
     },
     async ({ start_date, end_date }) => {
-      const income = db.accounts.getCategoryAnalysis("income", {
+      const income = client.accounts.getCategoryAnalysis("income", {
         startDate: start_date,
         endDate: end_date,
       });
@@ -169,7 +220,7 @@ export function registerAccountTools(server: McpServer, db: BanktivityDatabase):
       annotations: { readOnlyHint: true },
     },
     async () => {
-      const netWorth = db.accounts.getNetWorth();
+      const netWorth = client.accounts.getNetWorth();
 
       return jsonResponse({
         ...netWorth,
@@ -184,15 +235,16 @@ export function registerAccountTools(server: McpServer, db: BanktivityDatabase):
     "get_summary",
     {
       title: "Get Summary",
-      description: "Get a summary of the Banktivity database including account counts and transaction totals",
+      description:
+        "Get a summary of the Banktivity database including account counts and transaction totals",
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
     async () => {
-      const accounts = db.accounts.getAll(true);
-      const transactionCount = db.transactions.getCount();
-      const netWorth = db.accounts.getNetWorth();
-      const tags = db.tags.getAll();
+      const accounts = client.accounts.list({ includeHidden: true });
+      const transactionCount = client.transactions.count();
+      const netWorth = client.accounts.getNetWorth();
+      const tags = client.tags.list();
 
       const bankAccounts = accounts.filter((a) => a.accountClass < 6000);
       const incomeCategories = accounts.filter((a) => a.accountClass === 6000);
@@ -203,7 +255,8 @@ export function registerAccountTools(server: McpServer, db: BanktivityDatabase):
           total: bankAccounts.length,
           checking: bankAccounts.filter((a) => a.accountClass === 1006).length,
           savings: bankAccounts.filter((a) => a.accountClass === 1002).length,
-          creditCards: bankAccounts.filter((a) => a.accountClass === 5001).length,
+          creditCards: bankAccounts.filter((a) => a.accountClass === 5001)
+            .length,
         },
         categories: {
           income: incomeCategories.length,

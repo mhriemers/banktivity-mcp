@@ -1,22 +1,26 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { BanktivityDatabase } from "../database/index.js";
+import { BanktivityClient } from "banktivity-sdk";
 import { jsonResponse, errorResponse, successResponse } from "./helpers.js";
 
 /**
  * Register transaction template-related tools
  */
-export function registerTemplateTools(server: McpServer, db: BanktivityDatabase): void {
+export function registerTemplateTools(
+  server: McpServer,
+  client: BanktivityClient
+): void {
   server.registerTool(
     "list_transaction_templates",
     {
       title: "List Transaction Templates",
-      description: "List all transaction templates (used for import rules and scheduled transactions)",
+      description:
+        "List all transaction templates (used for import rules and scheduled transactions)",
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
     async () => {
-      const templates = db.templates.getAll();
+      const templates = client.templates.list();
       return jsonResponse(templates);
     }
   );
@@ -32,7 +36,7 @@ export function registerTemplateTools(server: McpServer, db: BanktivityDatabase)
       annotations: { readOnlyHint: true },
     },
     async ({ template_id }) => {
-      const template = db.templates.getById(template_id);
+      const template = client.templates.get(template_id);
       if (!template) {
         return errorResponse(`Template not found: ${template_id}`);
       }
@@ -44,7 +48,8 @@ export function registerTemplateTools(server: McpServer, db: BanktivityDatabase)
     "create_transaction_template",
     {
       title: "Create Transaction Template",
-      description: "Create a new transaction template for use with import rules or scheduled transactions",
+      description:
+        "Create a new transaction template for use with import rules or scheduled transactions",
       inputSchema: {
         title: z.string().describe("The template title (payee name)"),
         amount: z.number().describe("The default transaction amount"),
@@ -64,7 +69,7 @@ export function registerTemplateTools(server: McpServer, db: BanktivityDatabase)
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
     async ({ title, amount, note, currency_id, line_items }) => {
-      const templateId = db.templates.create({
+      const templateId = client.templates.create({
         title,
         amount,
         note,
@@ -76,8 +81,11 @@ export function registerTemplateTools(server: McpServer, db: BanktivityDatabase)
         })),
       });
 
-      const template = db.templates.getById(templateId);
-      return successResponse("Template created successfully", { templateId, template });
+      const template = client.templates.get(templateId);
+      return successResponse("Template created successfully", {
+        templateId,
+        template,
+      });
     }
   );
 
@@ -96,13 +104,18 @@ export function registerTemplateTools(server: McpServer, db: BanktivityDatabase)
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
     async ({ template_id, title, amount, note, active }) => {
-      const success = db.templates.update(template_id, { title, amount, note, active });
+      const success = client.templates.update(template_id, {
+        title,
+        amount,
+        note,
+        active,
+      });
 
       if (!success) {
         return errorResponse("Template not found or no updates provided");
       }
 
-      const template = db.templates.getById(template_id);
+      const template = client.templates.get(template_id);
       return successResponse("Template updated successfully", { template });
     }
   );
@@ -111,20 +124,23 @@ export function registerTemplateTools(server: McpServer, db: BanktivityDatabase)
     "delete_transaction_template",
     {
       title: "Delete Transaction Template",
-      description: "Delete a transaction template (also deletes associated import rules and schedules)",
+      description:
+        "Delete a transaction template (also deletes associated import rules and schedules)",
       inputSchema: {
         template_id: z.number().describe("The template ID to delete"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true },
     },
     async ({ template_id }) => {
-      const template = db.templates.getById(template_id);
+      const template = client.templates.get(template_id);
       if (!template) {
         return errorResponse(`Template not found: ${template_id}`);
       }
 
-      db.templates.delete(template_id);
-      return successResponse("Template deleted successfully", { deletedTemplate: template });
+      client.templates.delete(template_id);
+      return successResponse("Template deleted successfully", {
+        deletedTemplate: template,
+      });
     }
   );
 }
