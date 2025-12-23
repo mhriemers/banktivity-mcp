@@ -702,6 +702,696 @@ server.registerTool(
 );
 
 // ============================================
+// PAYEE TOOLS
+// ============================================
+
+server.registerTool(
+  "list_payees",
+  {
+    title: "List Payees",
+    description: "List all payees with their contact information",
+    inputSchema: {},
+    annotations: { readOnlyHint: true },
+  },
+  async () => {
+    const payees = db.getPayees();
+    return {
+      content: [{ type: "text", text: JSON.stringify(payees, null, 2) }],
+    };
+  }
+);
+
+server.registerTool(
+  "get_payee",
+  {
+    title: "Get Payee",
+    description: "Get a specific payee by ID",
+    inputSchema: {
+      payee_id: z.number().describe("The payee ID"),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ payee_id }) => {
+    const payee = db.getPayeeById(payee_id);
+    if (!payee) {
+      return {
+        content: [{ type: "text", text: `Payee not found: ${payee_id}` }],
+        isError: true,
+      };
+    }
+    return {
+      content: [{ type: "text", text: JSON.stringify(payee, null, 2) }],
+    };
+  }
+);
+
+server.registerTool(
+  "create_payee",
+  {
+    title: "Create Payee",
+    description: "Create a new payee with optional contact information",
+    inputSchema: {
+      name: z.string().describe("The payee name"),
+      phone: z.string().optional().describe("Phone number"),
+      street1: z.string().optional().describe("Street address line 1"),
+      street2: z.string().optional().describe("Street address line 2"),
+      street3: z.string().optional().describe("Street address line 3"),
+      city: z.string().optional().describe("City"),
+      state: z.string().optional().describe("State/Province"),
+      postal_code: z.string().optional().describe("Postal/ZIP code"),
+      country_code: z.string().optional().describe("Country code (e.g., 'US', 'NL')"),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  async ({ name, phone, street1, street2, street3, city, state, postal_code, country_code }) => {
+    const payeeId = db.createPayee({
+      name,
+      phone,
+      street1,
+      street2,
+      street3,
+      city,
+      state,
+      postalCode: postal_code,
+      countryCode: country_code,
+    });
+
+    const payee = db.getPayeeById(payeeId);
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ message: "Payee created successfully", payeeId, payee }, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+server.registerTool(
+  "update_payee",
+  {
+    title: "Update Payee",
+    description: "Update an existing payee's information",
+    inputSchema: {
+      payee_id: z.number().describe("The payee ID to update"),
+      name: z.string().optional().describe("New name"),
+      phone: z.string().optional().describe("New phone number"),
+      street1: z.string().optional().describe("New street address line 1"),
+      street2: z.string().optional().describe("New street address line 2"),
+      street3: z.string().optional().describe("New street address line 3"),
+      city: z.string().optional().describe("New city"),
+      state: z.string().optional().describe("New state/province"),
+      postal_code: z.string().optional().describe("New postal/ZIP code"),
+      country_code: z.string().optional().describe("New country code"),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  async ({ payee_id, name, phone, street1, street2, street3, city, state, postal_code, country_code }) => {
+    const success = db.updatePayee(payee_id, {
+      name,
+      phone,
+      street1,
+      street2,
+      street3,
+      city,
+      state,
+      postalCode: postal_code,
+      countryCode: country_code,
+    });
+
+    if (!success) {
+      return {
+        content: [{ type: "text", text: "Payee not found or no updates provided" }],
+        isError: true,
+      };
+    }
+
+    const payee = db.getPayeeById(payee_id);
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ message: "Payee updated successfully", payee }, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+server.registerTool(
+  "delete_payee",
+  {
+    title: "Delete Payee",
+    description: "Delete a payee",
+    inputSchema: {
+      payee_id: z.number().describe("The payee ID to delete"),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true },
+  },
+  async ({ payee_id }) => {
+    const payee = db.getPayeeById(payee_id);
+    if (!payee) {
+      return {
+        content: [{ type: "text", text: `Payee not found: ${payee_id}` }],
+        isError: true,
+      };
+    }
+
+    db.deletePayee(payee_id);
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ message: "Payee deleted successfully", deletedPayee: payee }, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+// ============================================
+// TRANSACTION TEMPLATE TOOLS
+// ============================================
+
+server.registerTool(
+  "list_transaction_templates",
+  {
+    title: "List Transaction Templates",
+    description: "List all transaction templates (used for import rules and scheduled transactions)",
+    inputSchema: {},
+    annotations: { readOnlyHint: true },
+  },
+  async () => {
+    const templates = db.getTransactionTemplates();
+    return {
+      content: [{ type: "text", text: JSON.stringify(templates, null, 2) }],
+    };
+  }
+);
+
+server.registerTool(
+  "get_transaction_template",
+  {
+    title: "Get Transaction Template",
+    description: "Get a specific transaction template by ID",
+    inputSchema: {
+      template_id: z.number().describe("The template ID"),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ template_id }) => {
+    const template = db.getTransactionTemplateById(template_id);
+    if (!template) {
+      return {
+        content: [{ type: "text", text: `Template not found: ${template_id}` }],
+        isError: true,
+      };
+    }
+    return {
+      content: [{ type: "text", text: JSON.stringify(template, null, 2) }],
+    };
+  }
+);
+
+server.registerTool(
+  "create_transaction_template",
+  {
+    title: "Create Transaction Template",
+    description: "Create a new transaction template for use with import rules or scheduled transactions",
+    inputSchema: {
+      title: z.string().describe("The template title (payee name)"),
+      amount: z.number().describe("The default transaction amount"),
+      note: z.string().optional().describe("Optional note"),
+      currency_id: z.string().optional().describe("Currency UUID"),
+      line_items: z
+        .array(
+          z.object({
+            account_id: z.string().describe("Account UUID"),
+            amount: z.number().describe("Line item amount"),
+            memo: z.string().optional().describe("Line item memo"),
+          })
+        )
+        .optional()
+        .describe("Optional line items for split transactions"),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  async ({ title, amount, note, currency_id, line_items }) => {
+    const templateId = db.createTransactionTemplate({
+      title,
+      amount,
+      note,
+      currencyId: currency_id,
+      lineItems: line_items?.map((li) => ({ accountId: li.account_id, amount: li.amount, memo: li.memo })),
+    });
+
+    const template = db.getTransactionTemplateById(templateId);
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ message: "Template created successfully", templateId, template }, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+server.registerTool(
+  "update_transaction_template",
+  {
+    title: "Update Transaction Template",
+    description: "Update an existing transaction template",
+    inputSchema: {
+      template_id: z.number().describe("The template ID to update"),
+      title: z.string().optional().describe("New title"),
+      amount: z.number().optional().describe("New amount"),
+      note: z.string().optional().describe("New note"),
+      active: z.boolean().optional().describe("Set active status"),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  async ({ template_id, title, amount, note, active }) => {
+    const success = db.updateTransactionTemplate(template_id, { title, amount, note, active });
+
+    if (!success) {
+      return {
+        content: [{ type: "text", text: "Template not found or no updates provided" }],
+        isError: true,
+      };
+    }
+
+    const template = db.getTransactionTemplateById(template_id);
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ message: "Template updated successfully", template }, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+server.registerTool(
+  "delete_transaction_template",
+  {
+    title: "Delete Transaction Template",
+    description: "Delete a transaction template (also deletes associated import rules and schedules)",
+    inputSchema: {
+      template_id: z.number().describe("The template ID to delete"),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true },
+  },
+  async ({ template_id }) => {
+    const template = db.getTransactionTemplateById(template_id);
+    if (!template) {
+      return {
+        content: [{ type: "text", text: `Template not found: ${template_id}` }],
+        isError: true,
+      };
+    }
+
+    db.deleteTransactionTemplate(template_id);
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ message: "Template deleted successfully", deletedTemplate: template }, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+// ============================================
+// IMPORT RULE TOOLS
+// ============================================
+
+server.registerTool(
+  "list_import_rules",
+  {
+    title: "List Import Rules",
+    description: "List all import rules (patterns to match and categorize imported transactions)",
+    inputSchema: {},
+    annotations: { readOnlyHint: true },
+  },
+  async () => {
+    const rules = db.getImportRules();
+    return {
+      content: [{ type: "text", text: JSON.stringify(rules, null, 2) }],
+    };
+  }
+);
+
+server.registerTool(
+  "get_import_rule",
+  {
+    title: "Get Import Rule",
+    description: "Get a specific import rule by ID",
+    inputSchema: {
+      rule_id: z.number().describe("The import rule ID"),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ rule_id }) => {
+    const rule = db.getImportRuleById(rule_id);
+    if (!rule) {
+      return {
+        content: [{ type: "text", text: `Import rule not found: ${rule_id}` }],
+        isError: true,
+      };
+    }
+    return {
+      content: [{ type: "text", text: JSON.stringify(rule, null, 2) }],
+    };
+  }
+);
+
+server.registerTool(
+  "create_import_rule",
+  {
+    title: "Create Import Rule",
+    description: "Create a new import rule to automatically categorize imported transactions based on a regex pattern",
+    inputSchema: {
+      template_id: z.number().describe("The transaction template ID to apply when this rule matches"),
+      pattern: z.string().describe("Regex pattern to match against transaction descriptions"),
+      account_id: z.string().optional().describe("Optional account UUID to filter by"),
+      payee: z.string().optional().describe("Optional payee name to set"),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  async ({ template_id, pattern, account_id, payee }) => {
+    // Validate regex pattern
+    try {
+      new RegExp(pattern);
+    } catch {
+      return {
+        content: [{ type: "text", text: `Invalid regex pattern: ${pattern}` }],
+        isError: true,
+      };
+    }
+
+    const ruleId = db.createImportRule({
+      templateId: template_id,
+      pattern,
+      accountId: account_id,
+      payee,
+    });
+
+    const rule = db.getImportRuleById(ruleId);
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ message: "Import rule created successfully", ruleId, rule }, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+server.registerTool(
+  "update_import_rule",
+  {
+    title: "Update Import Rule",
+    description: "Update an existing import rule",
+    inputSchema: {
+      rule_id: z.number().describe("The import rule ID to update"),
+      pattern: z.string().optional().describe("New regex pattern"),
+      account_id: z.string().optional().describe("New account UUID"),
+      payee: z.string().optional().describe("New payee name"),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  async ({ rule_id, pattern, account_id, payee }) => {
+    if (pattern) {
+      try {
+        new RegExp(pattern);
+      } catch {
+        return {
+          content: [{ type: "text", text: `Invalid regex pattern: ${pattern}` }],
+          isError: true,
+        };
+      }
+    }
+
+    const success = db.updateImportRule(rule_id, {
+      pattern,
+      accountId: account_id,
+      payee,
+    });
+
+    if (!success) {
+      return {
+        content: [{ type: "text", text: "Import rule not found or no updates provided" }],
+        isError: true,
+      };
+    }
+
+    const rule = db.getImportRuleById(rule_id);
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ message: "Import rule updated successfully", rule }, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+server.registerTool(
+  "delete_import_rule",
+  {
+    title: "Delete Import Rule",
+    description: "Delete an import rule",
+    inputSchema: {
+      rule_id: z.number().describe("The import rule ID to delete"),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true },
+  },
+  async ({ rule_id }) => {
+    const rule = db.getImportRuleById(rule_id);
+    if (!rule) {
+      return {
+        content: [{ type: "text", text: `Import rule not found: ${rule_id}` }],
+        isError: true,
+      };
+    }
+
+    db.deleteImportRule(rule_id);
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ message: "Import rule deleted successfully", deletedRule: rule }, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+server.registerTool(
+  "match_import_rules",
+  {
+    title: "Match Import Rules",
+    description: "Test which import rules match a given transaction description",
+    inputSchema: {
+      description: z.string().describe("The transaction description to test against import rules"),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ description }) => {
+    const matches = db.matchImportRules(description);
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              description,
+              matchCount: matches.length,
+              matches,
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  }
+);
+
+// ============================================
+// SCHEDULED TRANSACTION TOOLS
+// ============================================
+
+server.registerTool(
+  "list_scheduled_transactions",
+  {
+    title: "List Scheduled Transactions",
+    description: "List all scheduled/recurring transactions",
+    inputSchema: {},
+    annotations: { readOnlyHint: true },
+  },
+  async () => {
+    const schedules = db.getScheduledTransactions();
+    return {
+      content: [{ type: "text", text: JSON.stringify(schedules, null, 2) }],
+    };
+  }
+);
+
+server.registerTool(
+  "get_scheduled_transaction",
+  {
+    title: "Get Scheduled Transaction",
+    description: "Get a specific scheduled transaction by ID",
+    inputSchema: {
+      schedule_id: z.number().describe("The scheduled transaction ID"),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ schedule_id }) => {
+    const schedule = db.getScheduledTransactionById(schedule_id);
+    if (!schedule) {
+      return {
+        content: [{ type: "text", text: `Scheduled transaction not found: ${schedule_id}` }],
+        isError: true,
+      };
+    }
+    return {
+      content: [{ type: "text", text: JSON.stringify(schedule, null, 2) }],
+    };
+  }
+);
+
+server.registerTool(
+  "create_scheduled_transaction",
+  {
+    title: "Create Scheduled Transaction",
+    description: "Create a new scheduled/recurring transaction",
+    inputSchema: {
+      template_id: z.number().describe("The transaction template ID to use"),
+      start_date: z.string().describe("Start date in ISO format (YYYY-MM-DD)"),
+      account_id: z.string().optional().describe("Account UUID for the transaction"),
+      repeat_interval: z.number().optional().default(1).describe("Repeat interval (1=daily, 7=weekly, 30=monthly)"),
+      repeat_multiplier: z.number().optional().default(1).describe("Multiplier for repeat interval"),
+      reminder_days: z.number().optional().default(7).describe("Days in advance to show reminder"),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  async ({ template_id, start_date, account_id, repeat_interval, repeat_multiplier, reminder_days }) => {
+    // Verify template exists
+    const template = db.getTransactionTemplateById(template_id);
+    if (!template) {
+      return {
+        content: [{ type: "text", text: `Template not found: ${template_id}` }],
+        isError: true,
+      };
+    }
+
+    const scheduleId = db.createScheduledTransaction({
+      templateId: template_id,
+      startDate: start_date,
+      accountId: account_id,
+      repeatInterval: repeat_interval,
+      repeatMultiplier: repeat_multiplier,
+      reminderDays: reminder_days,
+    });
+
+    const schedule = db.getScheduledTransactionById(scheduleId);
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ message: "Scheduled transaction created successfully", scheduleId, schedule }, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+server.registerTool(
+  "update_scheduled_transaction",
+  {
+    title: "Update Scheduled Transaction",
+    description: "Update an existing scheduled transaction",
+    inputSchema: {
+      schedule_id: z.number().describe("The scheduled transaction ID to update"),
+      start_date: z.string().optional().describe("New start date in ISO format"),
+      next_date: z.string().optional().describe("New next occurrence date in ISO format"),
+      repeat_interval: z.number().optional().describe("New repeat interval"),
+      repeat_multiplier: z.number().optional().describe("New repeat multiplier"),
+      account_id: z.string().optional().describe("New account UUID"),
+      reminder_days: z.number().optional().describe("New reminder days"),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  async ({ schedule_id, start_date, next_date, repeat_interval, repeat_multiplier, account_id, reminder_days }) => {
+    const success = db.updateScheduledTransaction(schedule_id, {
+      startDate: start_date,
+      nextDate: next_date,
+      repeatInterval: repeat_interval,
+      repeatMultiplier: repeat_multiplier,
+      accountId: account_id,
+      reminderDays: reminder_days,
+    });
+
+    if (!success) {
+      return {
+        content: [{ type: "text", text: "Scheduled transaction not found or no updates provided" }],
+        isError: true,
+      };
+    }
+
+    const schedule = db.getScheduledTransactionById(schedule_id);
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ message: "Scheduled transaction updated successfully", schedule }, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+server.registerTool(
+  "delete_scheduled_transaction",
+  {
+    title: "Delete Scheduled Transaction",
+    description: "Delete a scheduled transaction",
+    inputSchema: {
+      schedule_id: z.number().describe("The scheduled transaction ID to delete"),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true },
+  },
+  async ({ schedule_id }) => {
+    const schedule = db.getScheduledTransactionById(schedule_id);
+    if (!schedule) {
+      return {
+        content: [{ type: "text", text: `Scheduled transaction not found: ${schedule_id}` }],
+        isError: true,
+      };
+    }
+
+    db.deleteScheduledTransaction(schedule_id);
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ message: "Scheduled transaction deleted successfully", deletedSchedule: schedule }, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+// ============================================
 // SERVER STARTUP
 // ============================================
 

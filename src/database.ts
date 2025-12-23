@@ -9,8 +9,16 @@ const CORE_DATA_EPOCH_OFFSET = 978307200;
 const Z_ENT = {
   ACCOUNT: 1,
   LINEITEM: 19,
+  LINEITEM_TEMPLATE: 21,
+  PAYEE: 31,
+  PAYEE_INFO: 33,
+  RECURRING_TRANSACTION: 35,
   TAG: 47,
+  TEMPLATE_SELECTOR: 48,
+  IMPORT_SOURCE_TEMPLATE_SELECTOR: 49,
+  SCHEDULED_TEMPLATE_SELECTOR: 52,
   TRANSACTION: 53,
+  TRANSACTION_TEMPLATE: 54,
   TRANSACTION_TYPE: 55,
 } as const;
 
@@ -67,6 +75,63 @@ export interface CategorySpending {
   category: string;
   total: number;
   transactionCount: number;
+}
+
+export interface Payee {
+  id: number;
+  name: string;
+  phone: string | null;
+  street1: string | null;
+  street2: string | null;
+  street3: string | null;
+  city: string | null;
+  state: string | null;
+  postalCode: string | null;
+  countryCode: string | null;
+}
+
+export interface TransactionTemplate {
+  id: number;
+  title: string;
+  amount: number;
+  currencyId: string | null;
+  note: string | null;
+  active: boolean;
+  fixedAmount: boolean;
+  lastAppliedDate: string | null;
+  lineItems: LineItemTemplate[];
+}
+
+export interface LineItemTemplate {
+  id: number;
+  accountId: string;
+  accountName: string | null;
+  amount: number;
+  memo: string | null;
+  fixedAmount: boolean;
+}
+
+export interface ImportRule {
+  id: number;
+  templateId: number;
+  templateTitle: string;
+  pattern: string;
+  accountId: string | null;
+  payee: string | null;
+}
+
+export interface ScheduledTransaction {
+  id: number;
+  templateId: number;
+  templateTitle: string;
+  amount: number;
+  startDate: string | null;
+  nextDate: string | null;
+  repeatInterval: number | null;
+  repeatMultiplier: number | null;
+  accountId: string | null;
+  reminderDays: number | null;
+  recurringTransactionId: number | null;
 }
 
 // Account class mappings
@@ -907,5 +972,889 @@ export class BanktivityDatabase {
       transactionType: row.transactionType,
       lineItems: this.getLineItemsForTransaction(row.id),
     };
+  }
+
+  // ============================================
+  // PAYEE OPERATIONS
+  // ============================================
+
+  /**
+   * Get all payees
+   */
+  getPayees(): Payee[] {
+    const sql = `
+      SELECT
+        p.Z_PK as id,
+        pi.ZPNAME as name,
+        pi.ZPPHONE as phone,
+        pi.ZPSTREET1 as street1,
+        pi.ZPSTREET2 as street2,
+        pi.ZPSTREET3 as street3,
+        pi.ZPCITY as city,
+        pi.ZPSTATE as state,
+        pi.ZPPOSTALCODE as postalCode,
+        pi.ZPCOUNTRYCODE as countryCode
+      FROM ZPAYEE p
+      JOIN ZPAYEEINFO pi ON p.ZPPAYEEINFO = pi.Z_PK
+      ORDER BY pi.ZPNAME
+    `;
+
+    const rows = this.db.prepare(sql).all() as Array<{
+      id: number;
+      name: string;
+      phone: string | null;
+      street1: string | null;
+      street2: string | null;
+      street3: string | null;
+      city: string | null;
+      state: string | null;
+      postalCode: string | null;
+      countryCode: string | null;
+    }>;
+
+    return rows;
+  }
+
+  /**
+   * Get payee by ID
+   */
+  getPayeeById(payeeId: number): Payee | null {
+    const sql = `
+      SELECT
+        p.Z_PK as id,
+        pi.ZPNAME as name,
+        pi.ZPPHONE as phone,
+        pi.ZPSTREET1 as street1,
+        pi.ZPSTREET2 as street2,
+        pi.ZPSTREET3 as street3,
+        pi.ZPCITY as city,
+        pi.ZPSTATE as state,
+        pi.ZPPOSTALCODE as postalCode,
+        pi.ZPCOUNTRYCODE as countryCode
+      FROM ZPAYEE p
+      JOIN ZPAYEEINFO pi ON p.ZPPAYEEINFO = pi.Z_PK
+      WHERE p.Z_PK = ?
+    `;
+
+    const row = this.db.prepare(sql).get(payeeId) as Payee | undefined;
+    return row ?? null;
+  }
+
+  /**
+   * Create a new payee
+   */
+  createPayee(options: {
+    name: string;
+    phone?: string;
+    street1?: string;
+    street2?: string;
+    street3?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    countryCode?: string;
+  }): number {
+    const now = nowAsCoreData();
+
+    let payeeId = 0;
+
+    const transaction = this.db.transaction(() => {
+      // First create PayeeInfo
+      const insertPayeeInfo = this.db.prepare(`
+        INSERT INTO ZPAYEEINFO (
+          Z_ENT, Z_OPT, ZPNAME, ZPPHONE, ZPSTREET1, ZPSTREET2, ZPSTREET3,
+          ZPCITY, ZPSTATE, ZPPOSTALCODE, ZPCOUNTRYCODE
+        ) VALUES (?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const payeeInfoResult = insertPayeeInfo.run(
+        Z_ENT.PAYEE_INFO,
+        options.name,
+        options.phone ?? null,
+        options.street1 ?? null,
+        options.street2 ?? null,
+        options.street3 ?? null,
+        options.city ?? null,
+        options.state ?? null,
+        options.postalCode ?? null,
+        options.countryCode ?? null
+      );
+
+      const payeeInfoId = payeeInfoResult.lastInsertRowid as number;
+
+      // Then create Payee linking to PayeeInfo
+      const insertPayee = this.db.prepare(`
+        INSERT INTO ZPAYEE (Z_ENT, Z_OPT, ZPPAYEEINFO)
+        VALUES (?, 0, ?)
+      `);
+
+      const payeeResult = insertPayee.run(Z_ENT.PAYEE, payeeInfoId);
+      payeeId = payeeResult.lastInsertRowid as number;
+    });
+
+    transaction();
+    return payeeId;
+  }
+
+  /**
+   * Update a payee
+   */
+  updatePayee(
+    payeeId: number,
+    updates: {
+      name?: string;
+      phone?: string;
+      street1?: string;
+      street2?: string;
+      street3?: string;
+      city?: string;
+      state?: string;
+      postalCode?: string;
+      countryCode?: string;
+    }
+  ): boolean {
+    // Get PayeeInfo ID
+    const payee = this.db.prepare(
+      `SELECT ZPPAYEEINFO as payeeInfoId FROM ZPAYEE WHERE Z_PK = ?`
+    ).get(payeeId) as { payeeInfoId: number } | undefined;
+
+    if (!payee) return false;
+
+    const setClauses: string[] = [];
+    const params: (string | null)[] = [];
+
+    if (updates.name !== undefined) {
+      setClauses.push("ZPNAME = ?");
+      params.push(updates.name);
+    }
+    if (updates.phone !== undefined) {
+      setClauses.push("ZPPHONE = ?");
+      params.push(updates.phone);
+    }
+    if (updates.street1 !== undefined) {
+      setClauses.push("ZPSTREET1 = ?");
+      params.push(updates.street1);
+    }
+    if (updates.street2 !== undefined) {
+      setClauses.push("ZPSTREET2 = ?");
+      params.push(updates.street2);
+    }
+    if (updates.street3 !== undefined) {
+      setClauses.push("ZPSTREET3 = ?");
+      params.push(updates.street3);
+    }
+    if (updates.city !== undefined) {
+      setClauses.push("ZPCITY = ?");
+      params.push(updates.city);
+    }
+    if (updates.state !== undefined) {
+      setClauses.push("ZPSTATE = ?");
+      params.push(updates.state);
+    }
+    if (updates.postalCode !== undefined) {
+      setClauses.push("ZPPOSTALCODE = ?");
+      params.push(updates.postalCode);
+    }
+    if (updates.countryCode !== undefined) {
+      setClauses.push("ZPCOUNTRYCODE = ?");
+      params.push(updates.countryCode);
+    }
+
+    if (setClauses.length === 0) return false;
+
+    params.push(payee.payeeInfoId.toString());
+
+    const sql = `UPDATE ZPAYEEINFO SET ${setClauses.join(", ")} WHERE Z_PK = ?`;
+    const result = this.db.prepare(sql).run(...params);
+
+    return result.changes > 0;
+  }
+
+  /**
+   * Delete a payee
+   */
+  deletePayee(payeeId: number): boolean {
+    // Get PayeeInfo ID
+    const payee = this.db.prepare(
+      `SELECT ZPPAYEEINFO as payeeInfoId FROM ZPAYEE WHERE Z_PK = ?`
+    ).get(payeeId) as { payeeInfoId: number } | undefined;
+
+    if (!payee) return false;
+
+    const transaction = this.db.transaction(() => {
+      // Delete payee first
+      this.db.prepare(`DELETE FROM ZPAYEE WHERE Z_PK = ?`).run(payeeId);
+      // Then delete payee info
+      this.db.prepare(`DELETE FROM ZPAYEEINFO WHERE Z_PK = ?`).run(payee.payeeInfoId);
+    });
+
+    transaction();
+    return true;
+  }
+
+  // ============================================
+  // TRANSACTION TEMPLATE OPERATIONS
+  // ============================================
+
+  /**
+   * Get all transaction templates
+   */
+  getTransactionTemplates(): TransactionTemplate[] {
+    const sql = `
+      SELECT
+        Z_PK as id,
+        ZPTITLE as title,
+        ZPAMOUNT as amount,
+        ZPCURRENCYID as currencyId,
+        ZPNOTE as note,
+        ZPACTIVE as active,
+        ZPFIXEDAMOUNT as fixedAmount,
+        ZPLASTAPPLIEDDATE as lastAppliedDate
+      FROM ZTRANSACTIONTEMPLATE
+      ORDER BY ZPTITLE
+    `;
+
+    const rows = this.db.prepare(sql).all() as Array<{
+      id: number;
+      title: string;
+      amount: number;
+      currencyId: string | null;
+      note: string | null;
+      active: number | null;
+      fixedAmount: number | null;
+      lastAppliedDate: number | null;
+    }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      amount: row.amount,
+      currencyId: row.currencyId,
+      note: row.note,
+      active: row.active === 1,
+      fixedAmount: row.fixedAmount === 1,
+      lastAppliedDate: row.lastAppliedDate ? coreDataToISO(row.lastAppliedDate) : null,
+      lineItems: this.getLineItemTemplatesForTemplate(row.id),
+    }));
+  }
+
+  /**
+   * Get line item templates for a transaction template
+   */
+  private getLineItemTemplatesForTemplate(templateId: number): LineItemTemplate[] {
+    const sql = `
+      SELECT
+        lit.Z_PK as id,
+        lit.ZPACCOUNTID as accountId,
+        a.ZPNAME as accountName,
+        lit.ZPTRANSACTIONAMOUNT as amount,
+        lit.ZPMEMO as memo,
+        lit.ZPFIXEDAMOUNT as fixedAmount
+      FROM ZLINEITEMTEMPLATE lit
+      LEFT JOIN ZACCOUNT a ON lit.ZPACCOUNTID = a.ZPUNIQUEID
+      WHERE lit.ZPTRANSACTIONTEMPLATE = ?
+    `;
+
+    const rows = this.db.prepare(sql).all(templateId) as Array<{
+      id: number;
+      accountId: string;
+      accountName: string | null;
+      amount: number;
+      memo: string | null;
+      fixedAmount: number | null;
+    }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      accountId: row.accountId,
+      accountName: row.accountName,
+      amount: row.amount,
+      memo: row.memo,
+      fixedAmount: row.fixedAmount === 1,
+    }));
+  }
+
+  /**
+   * Get transaction template by ID
+   */
+  getTransactionTemplateById(templateId: number): TransactionTemplate | null {
+    const sql = `
+      SELECT
+        Z_PK as id,
+        ZPTITLE as title,
+        ZPAMOUNT as amount,
+        ZPCURRENCYID as currencyId,
+        ZPNOTE as note,
+        ZPACTIVE as active,
+        ZPFIXEDAMOUNT as fixedAmount,
+        ZPLASTAPPLIEDDATE as lastAppliedDate
+      FROM ZTRANSACTIONTEMPLATE
+      WHERE Z_PK = ?
+    `;
+
+    const row = this.db.prepare(sql).get(templateId) as {
+      id: number;
+      title: string;
+      amount: number;
+      currencyId: string | null;
+      note: string | null;
+      active: number | null;
+      fixedAmount: number | null;
+      lastAppliedDate: number | null;
+    } | undefined;
+
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      title: row.title,
+      amount: row.amount,
+      currencyId: row.currencyId,
+      note: row.note,
+      active: row.active === 1,
+      fixedAmount: row.fixedAmount === 1,
+      lastAppliedDate: row.lastAppliedDate ? coreDataToISO(row.lastAppliedDate) : null,
+      lineItems: this.getLineItemTemplatesForTemplate(row.id),
+    };
+  }
+
+  /**
+   * Create a transaction template
+   */
+  createTransactionTemplate(options: {
+    title: string;
+    amount: number;
+    note?: string;
+    currencyId?: string;
+    lineItems?: Array<{
+      accountId: string;
+      amount: number;
+      memo?: string;
+    }>;
+  }): number {
+    const now = nowAsCoreData();
+    const uuid = generateUUID();
+
+    let templateId = 0;
+
+    const transaction = this.db.transaction(() => {
+      const insertTemplate = this.db.prepare(`
+        INSERT INTO ZTRANSACTIONTEMPLATE (
+          Z_ENT, Z_OPT, ZPACTIVE, ZPFIXEDAMOUNT,
+          ZPCREATIONTIME, ZPMODIFICATIONDATE,
+          ZPAMOUNT, ZPCURRENCYID, ZPNOTE, ZPTITLE, ZPUNIQUEID
+        ) VALUES (?, 0, 1, 1, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const result = insertTemplate.run(
+        Z_ENT.TRANSACTION_TEMPLATE,
+        now,
+        now,
+        options.amount,
+        options.currencyId ?? null,
+        options.note ?? null,
+        options.title,
+        uuid
+      );
+
+      templateId = result.lastInsertRowid as number;
+
+      // Add line items if provided
+      if (options.lineItems && options.lineItems.length > 0) {
+        const insertLineItem = this.db.prepare(`
+          INSERT INTO ZLINEITEMTEMPLATE (
+            Z_ENT, Z_OPT, ZPFIXEDAMOUNT, ZPTRANSACTIONTEMPLATE,
+            ZPCREATIONTIME, ZPTRANSACTIONAMOUNT, ZPACCOUNTID, ZPMEMO
+          ) VALUES (?, 0, 1, ?, ?, ?, ?, ?)
+        `);
+
+        for (const item of options.lineItems) {
+          insertLineItem.run(
+            Z_ENT.LINEITEM_TEMPLATE,
+            templateId,
+            now,
+            item.amount,
+            item.accountId,
+            item.memo ?? null
+          );
+        }
+      }
+    });
+
+    transaction();
+    return templateId;
+  }
+
+  /**
+   * Update a transaction template
+   */
+  updateTransactionTemplate(
+    templateId: number,
+    updates: {
+      title?: string;
+      amount?: number;
+      note?: string;
+      active?: boolean;
+    }
+  ): boolean {
+    const setClauses: string[] = [];
+    const params: (string | number | null)[] = [];
+
+    if (updates.title !== undefined) {
+      setClauses.push("ZPTITLE = ?");
+      params.push(updates.title);
+    }
+    if (updates.amount !== undefined) {
+      setClauses.push("ZPAMOUNT = ?");
+      params.push(updates.amount);
+    }
+    if (updates.note !== undefined) {
+      setClauses.push("ZPNOTE = ?");
+      params.push(updates.note);
+    }
+    if (updates.active !== undefined) {
+      setClauses.push("ZPACTIVE = ?");
+      params.push(updates.active ? 1 : 0);
+    }
+
+    if (setClauses.length === 0) return false;
+
+    setClauses.push("ZPMODIFICATIONDATE = ?");
+    params.push(nowAsCoreData());
+
+    params.push(templateId);
+
+    const sql = `UPDATE ZTRANSACTIONTEMPLATE SET ${setClauses.join(", ")} WHERE Z_PK = ?`;
+    const result = this.db.prepare(sql).run(...params);
+
+    return result.changes > 0;
+  }
+
+  /**
+   * Delete a transaction template and related items
+   */
+  deleteTransactionTemplate(templateId: number): boolean {
+    const transaction = this.db.transaction(() => {
+      // Delete line item templates
+      this.db.prepare(`DELETE FROM ZLINEITEMTEMPLATE WHERE ZPTRANSACTIONTEMPLATE = ?`).run(templateId);
+      // Delete template selectors (import rules and scheduled transactions)
+      this.db.prepare(`DELETE FROM ZTEMPLATESELECTOR WHERE ZPTRANSACTIONTEMPLATE = ?`).run(templateId);
+      // Delete template
+      this.db.prepare(`DELETE FROM ZTRANSACTIONTEMPLATE WHERE Z_PK = ?`).run(templateId);
+    });
+
+    transaction();
+    return true;
+  }
+
+  // ============================================
+  // IMPORT RULE OPERATIONS
+  // ============================================
+
+  /**
+   * Get all import rules
+   */
+  getImportRules(): ImportRule[] {
+    const sql = `
+      SELECT
+        ts.Z_PK as id,
+        ts.ZPTRANSACTIONTEMPLATE as templateId,
+        tt.ZPTITLE as templateTitle,
+        ts.ZPDETAILSEXPRESSION as pattern,
+        ts.ZPACCOUNTID as accountId,
+        ts.ZPPAYEE as payee
+      FROM ZTEMPLATESELECTOR ts
+      JOIN ZTRANSACTIONTEMPLATE tt ON ts.ZPTRANSACTIONTEMPLATE = tt.Z_PK
+      WHERE ts.Z_ENT = ?
+      ORDER BY tt.ZPTITLE
+    `;
+
+    const rows = this.db.prepare(sql).all(Z_ENT.IMPORT_SOURCE_TEMPLATE_SELECTOR) as Array<{
+      id: number;
+      templateId: number;
+      templateTitle: string;
+      pattern: string;
+      accountId: string | null;
+      payee: string | null;
+    }>;
+
+    return rows;
+  }
+
+  /**
+   * Get import rule by ID
+   */
+  getImportRuleById(ruleId: number): ImportRule | null {
+    const sql = `
+      SELECT
+        ts.Z_PK as id,
+        ts.ZPTRANSACTIONTEMPLATE as templateId,
+        tt.ZPTITLE as templateTitle,
+        ts.ZPDETAILSEXPRESSION as pattern,
+        ts.ZPACCOUNTID as accountId,
+        ts.ZPPAYEE as payee
+      FROM ZTEMPLATESELECTOR ts
+      JOIN ZTRANSACTIONTEMPLATE tt ON ts.ZPTRANSACTIONTEMPLATE = tt.Z_PK
+      WHERE ts.Z_PK = ? AND ts.Z_ENT = ?
+    `;
+
+    const row = this.db.prepare(sql).get(ruleId, Z_ENT.IMPORT_SOURCE_TEMPLATE_SELECTOR) as ImportRule | undefined;
+    return row ?? null;
+  }
+
+  /**
+   * Create an import rule
+   */
+  createImportRule(options: {
+    templateId: number;
+    pattern: string;
+    accountId?: string;
+    payee?: string;
+  }): number {
+    const now = nowAsCoreData();
+    const uuid = generateUUID();
+
+    const sql = `
+      INSERT INTO ZTEMPLATESELECTOR (
+        Z_ENT, Z_OPT, ZPTRANSACTIONTEMPLATE,
+        ZPCREATIONTIME, ZPMODIFICATIONDATE,
+        ZPDETAILSEXPRESSION, ZPACCOUNTID, ZPPAYEE, ZPUNIQUEID
+      ) VALUES (?, 0, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const result = this.db.prepare(sql).run(
+      Z_ENT.IMPORT_SOURCE_TEMPLATE_SELECTOR,
+      options.templateId,
+      now,
+      now,
+      options.pattern,
+      options.accountId ?? null,
+      options.payee ?? null,
+      uuid
+    );
+
+    return result.lastInsertRowid as number;
+  }
+
+  /**
+   * Update an import rule
+   */
+  updateImportRule(
+    ruleId: number,
+    updates: {
+      pattern?: string;
+      accountId?: string;
+      payee?: string;
+    }
+  ): boolean {
+    const setClauses: string[] = [];
+    const params: (string | null)[] = [];
+
+    if (updates.pattern !== undefined) {
+      setClauses.push("ZPDETAILSEXPRESSION = ?");
+      params.push(updates.pattern);
+    }
+    if (updates.accountId !== undefined) {
+      setClauses.push("ZPACCOUNTID = ?");
+      params.push(updates.accountId);
+    }
+    if (updates.payee !== undefined) {
+      setClauses.push("ZPPAYEE = ?");
+      params.push(updates.payee);
+    }
+
+    if (setClauses.length === 0) return false;
+
+    setClauses.push("ZPMODIFICATIONDATE = ?");
+    params.push(nowAsCoreData().toString());
+
+    params.push(ruleId.toString());
+
+    const sql = `UPDATE ZTEMPLATESELECTOR SET ${setClauses.join(", ")} WHERE Z_PK = ? AND Z_ENT = ${Z_ENT.IMPORT_SOURCE_TEMPLATE_SELECTOR}`;
+    const result = this.db.prepare(sql).run(...params);
+
+    return result.changes > 0;
+  }
+
+  /**
+   * Delete an import rule
+   */
+  deleteImportRule(ruleId: number): boolean {
+    const sql = `DELETE FROM ZTEMPLATESELECTOR WHERE Z_PK = ? AND Z_ENT = ?`;
+    const result = this.db.prepare(sql).run(ruleId, Z_ENT.IMPORT_SOURCE_TEMPLATE_SELECTOR);
+    return result.changes > 0;
+  }
+
+  /**
+   * Match a transaction description against import rules
+   */
+  matchImportRules(description: string): ImportRule[] {
+    const rules = this.getImportRules();
+    const matches: ImportRule[] = [];
+
+    for (const rule of rules) {
+      try {
+        const regex = new RegExp(rule.pattern, "i");
+        if (regex.test(description)) {
+          matches.push(rule);
+        }
+      } catch {
+        // Invalid regex, skip
+      }
+    }
+
+    return matches;
+  }
+
+  // ============================================
+  // SCHEDULED TRANSACTION OPERATIONS
+  // ============================================
+
+  /**
+   * Get all scheduled transactions
+   */
+  getScheduledTransactions(): ScheduledTransaction[] {
+    const sql = `
+      SELECT
+        ts.Z_PK as id,
+        ts.ZPTRANSACTIONTEMPLATE as templateId,
+        tt.ZPTITLE as templateTitle,
+        tt.ZPAMOUNT as amount,
+        ts.ZPSTARTDATE as startDate,
+        ts.ZPEXTERNALCALENDARNEXTDATE as nextDate,
+        ts.ZPREPEATINTERVAL as repeatInterval,
+        ts.ZPREPEATMULTIPLIER as repeatMultiplier,
+        ts.ZPACCOUNTID as accountId,
+        ts.ZPREMINDDAYSINADVANCE as reminderDays,
+        ts.ZPRECURRINGTRANSACTION as recurringTransactionId
+      FROM ZTEMPLATESELECTOR ts
+      JOIN ZTRANSACTIONTEMPLATE tt ON ts.ZPTRANSACTIONTEMPLATE = tt.Z_PK
+      WHERE ts.Z_ENT = ?
+      ORDER BY ts.ZPSTARTDATE
+    `;
+
+    const rows = this.db.prepare(sql).all(Z_ENT.SCHEDULED_TEMPLATE_SELECTOR) as Array<{
+      id: number;
+      templateId: number;
+      templateTitle: string;
+      amount: number;
+      startDate: number | null;
+      nextDate: number | null;
+      repeatInterval: number | null;
+      repeatMultiplier: number | null;
+      accountId: string | null;
+      reminderDays: number | null;
+      recurringTransactionId: number | null;
+    }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      templateId: row.templateId,
+      templateTitle: row.templateTitle,
+      amount: row.amount,
+      startDate: row.startDate ? coreDataToISO(row.startDate) : null,
+      nextDate: row.nextDate ? coreDataToISO(row.nextDate) : null,
+      repeatInterval: row.repeatInterval,
+      repeatMultiplier: row.repeatMultiplier,
+      accountId: row.accountId,
+      reminderDays: row.reminderDays,
+      recurringTransactionId: row.recurringTransactionId,
+    }));
+  }
+
+  /**
+   * Get scheduled transaction by ID
+   */
+  getScheduledTransactionById(scheduleId: number): ScheduledTransaction | null {
+    const sql = `
+      SELECT
+        ts.Z_PK as id,
+        ts.ZPTRANSACTIONTEMPLATE as templateId,
+        tt.ZPTITLE as templateTitle,
+        tt.ZPAMOUNT as amount,
+        ts.ZPSTARTDATE as startDate,
+        ts.ZPEXTERNALCALENDARNEXTDATE as nextDate,
+        ts.ZPREPEATINTERVAL as repeatInterval,
+        ts.ZPREPEATMULTIPLIER as repeatMultiplier,
+        ts.ZPACCOUNTID as accountId,
+        ts.ZPREMINDDAYSINADVANCE as reminderDays,
+        ts.ZPRECURRINGTRANSACTION as recurringTransactionId
+      FROM ZTEMPLATESELECTOR ts
+      JOIN ZTRANSACTIONTEMPLATE tt ON ts.ZPTRANSACTIONTEMPLATE = tt.Z_PK
+      WHERE ts.Z_PK = ? AND ts.Z_ENT = ?
+    `;
+
+    const row = this.db.prepare(sql).get(scheduleId, Z_ENT.SCHEDULED_TEMPLATE_SELECTOR) as {
+      id: number;
+      templateId: number;
+      templateTitle: string;
+      amount: number;
+      startDate: number | null;
+      nextDate: number | null;
+      repeatInterval: number | null;
+      repeatMultiplier: number | null;
+      accountId: string | null;
+      reminderDays: number | null;
+      recurringTransactionId: number | null;
+    } | undefined;
+
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      templateId: row.templateId,
+      templateTitle: row.templateTitle,
+      amount: row.amount,
+      startDate: row.startDate ? coreDataToISO(row.startDate) : null,
+      nextDate: row.nextDate ? coreDataToISO(row.nextDate) : null,
+      repeatInterval: row.repeatInterval,
+      repeatMultiplier: row.repeatMultiplier,
+      accountId: row.accountId,
+      reminderDays: row.reminderDays,
+      recurringTransactionId: row.recurringTransactionId,
+    };
+  }
+
+  /**
+   * Create a scheduled transaction
+   */
+  createScheduledTransaction(options: {
+    templateId: number;
+    startDate: string;
+    accountId?: string;
+    repeatInterval?: number;
+    repeatMultiplier?: number;
+    reminderDays?: number;
+  }): number {
+    const now = nowAsCoreData();
+    const uuid = generateUUID();
+    const startDateCoreData = isoToCoreData(options.startDate);
+
+    // First create the recurring transaction record
+    const recurringUuid = generateUUID();
+    const insertRecurring = this.db.prepare(`
+      INSERT INTO ZRECURRINGTRANSACTION (
+        Z_ENT, Z_OPT, ZPATTRIBUTES, ZPPRIORITY, ZPREMINDDAYSINADVANCE,
+        ZPCREATIONTIME, ZPFIRSTUNPROCESSEDEVENTDATE, ZPMODIFICATIONDATE, ZPUNIQUEID
+      ) VALUES (?, 0, 1, 0, ?, ?, ?, ?, ?)
+    `);
+
+    const recurringResult = insertRecurring.run(
+      Z_ENT.RECURRING_TRANSACTION,
+      options.reminderDays ?? 7,
+      now,
+      startDateCoreData,
+      now,
+      recurringUuid
+    );
+
+    const recurringId = recurringResult.lastInsertRowid as number;
+
+    // Then create the template selector
+    const sql = `
+      INSERT INTO ZTEMPLATESELECTOR (
+        Z_ENT, Z_OPT, ZPTRANSACTIONTEMPLATE, ZPRECURRINGTRANSACTION,
+        ZPCREATIONTIME, ZPMODIFICATIONDATE, ZPSTARTDATE, ZPEXTERNALCALENDARNEXTDATE,
+        ZPREPEATINTERVAL, ZPREPEATMULTIPLIER, ZPACCOUNTID,
+        ZPREMINDDAYSINADVANCE, ZPUNIQUEID
+      ) VALUES (?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const result = this.db.prepare(sql).run(
+      Z_ENT.SCHEDULED_TEMPLATE_SELECTOR,
+      options.templateId,
+      recurringId,
+      now,
+      now,
+      startDateCoreData,
+      startDateCoreData,
+      options.repeatInterval ?? 1,
+      options.repeatMultiplier ?? 1,
+      options.accountId ?? null,
+      options.reminderDays ?? 7,
+      uuid
+    );
+
+    return result.lastInsertRowid as number;
+  }
+
+  /**
+   * Update a scheduled transaction
+   */
+  updateScheduledTransaction(
+    scheduleId: number,
+    updates: {
+      startDate?: string;
+      nextDate?: string;
+      repeatInterval?: number;
+      repeatMultiplier?: number;
+      accountId?: string;
+      reminderDays?: number;
+    }
+  ): boolean {
+    const setClauses: string[] = [];
+    const params: (string | number | null)[] = [];
+
+    if (updates.startDate !== undefined) {
+      setClauses.push("ZPSTARTDATE = ?");
+      params.push(isoToCoreData(updates.startDate));
+    }
+    if (updates.nextDate !== undefined) {
+      setClauses.push("ZPEXTERNALCALENDARNEXTDATE = ?");
+      params.push(isoToCoreData(updates.nextDate));
+    }
+    if (updates.repeatInterval !== undefined) {
+      setClauses.push("ZPREPEATINTERVAL = ?");
+      params.push(updates.repeatInterval);
+    }
+    if (updates.repeatMultiplier !== undefined) {
+      setClauses.push("ZPREPEATMULTIPLIER = ?");
+      params.push(updates.repeatMultiplier);
+    }
+    if (updates.accountId !== undefined) {
+      setClauses.push("ZPACCOUNTID = ?");
+      params.push(updates.accountId);
+    }
+    if (updates.reminderDays !== undefined) {
+      setClauses.push("ZPREMINDDAYSINADVANCE = ?");
+      params.push(updates.reminderDays);
+    }
+
+    if (setClauses.length === 0) return false;
+
+    setClauses.push("ZPMODIFICATIONDATE = ?");
+    params.push(nowAsCoreData());
+
+    params.push(scheduleId);
+
+    const sql = `UPDATE ZTEMPLATESELECTOR SET ${setClauses.join(", ")} WHERE Z_PK = ? AND Z_ENT = ${Z_ENT.SCHEDULED_TEMPLATE_SELECTOR}`;
+    const result = this.db.prepare(sql).run(...params);
+
+    return result.changes > 0;
+  }
+
+  /**
+   * Delete a scheduled transaction
+   */
+  deleteScheduledTransaction(scheduleId: number): boolean {
+    // Get the recurring transaction ID first
+    const schedule = this.db.prepare(
+      `SELECT ZPRECURRINGTRANSACTION as recurringId FROM ZTEMPLATESELECTOR WHERE Z_PK = ? AND Z_ENT = ?`
+    ).get(scheduleId, Z_ENT.SCHEDULED_TEMPLATE_SELECTOR) as { recurringId: number | null } | undefined;
+
+    if (!schedule) return false;
+
+    const transaction = this.db.transaction(() => {
+      // Delete the template selector
+      this.db.prepare(`DELETE FROM ZTEMPLATESELECTOR WHERE Z_PK = ?`).run(scheduleId);
+
+      // Delete the recurring transaction if it exists
+      if (schedule.recurringId) {
+        this.db.prepare(`DELETE FROM ZRECURRINGTRANSACTION WHERE Z_PK = ?`).run(schedule.recurringId);
+      }
+    });
+
+    transaction();
+    return true;
   }
 }
