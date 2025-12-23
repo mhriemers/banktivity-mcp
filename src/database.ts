@@ -7,7 +7,9 @@ const CORE_DATA_EPOCH_OFFSET = 978307200;
 
 // Core Data entity type constants (Z_ENT values)
 const Z_ENT = {
-  ACCOUNT: 1,
+  ACCOUNT: 1, // Base account type (rarely used directly)
+  CATEGORY: 2, // Category accounts (income/expense)
+  PRIMARY_ACCOUNT: 3, // Primary accounts (checking, savings, credit cards)
   LINEITEM: 19,
   LINEITEM_TEMPLATE: 21,
   PAYEE: 31,
@@ -779,6 +781,11 @@ export class BanktivityDatabase {
     // Determine if this is a debit account (assets are debit, liabilities are credit)
     const isDebit = options.accountClass !== ACCOUNT_CLASS.CREDIT_CARD;
 
+    // Determine entity type: Categories (income/expense) use Z_ENT=2, Primary accounts use Z_ENT=3
+    const isCategory = options.accountClass === ACCOUNT_CLASS.INCOME ||
+                       options.accountClass === ACCOUNT_CLASS.EXPENSE;
+    const entityType = isCategory ? Z_ENT.CATEGORY : Z_ENT.PRIMARY_ACCOUNT;
+
     const sql = `
       INSERT INTO ZACCOUNT (
         Z_ENT, Z_OPT, ZPACCOUNTCLASS, ZPDEBIT, ZPHIDDEN, ZPTAXABLE,
@@ -788,7 +795,7 @@ export class BanktivityDatabase {
     `;
 
     const result = this.db.prepare(sql).run(
-      Z_ENT.ACCOUNT,
+      entityType,
       options.accountClass,
       isDebit ? 1 : 0,
       options.hidden ? 1 : 0,
@@ -809,7 +816,8 @@ export class BanktivityDatabase {
   createTag(name: string): number {
     const now = nowAsCoreData();
     const uuid = generateUUID();
-    const canonicalName = name.toLowerCase().trim();
+    // Banktivity stores canonical names in UPPERCASE
+    const canonicalName = name.toUpperCase().trim();
 
     // Check if tag already exists
     const existing = this.db.prepare(
@@ -926,7 +934,8 @@ export class BanktivityDatabase {
    * Get a tag by name
    */
   getTagByName(name: string): { id: number; name: string } | null {
-    const canonicalName = name.toLowerCase().trim();
+    // Banktivity stores canonical names in UPPERCASE
+    const canonicalName = name.toUpperCase().trim();
     const sql = `SELECT Z_PK as id, ZPNAME as name FROM ZTAG WHERE ZPCANONICALNAME = ?`;
     const row = this.db.prepare(sql).get(canonicalName) as { id: number; name: string } | undefined;
     return row ?? null;
