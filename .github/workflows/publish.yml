@@ -24,6 +24,9 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
 
+      - name: Update npm
+        run: npm install -g npm@latest
+
       - name: Install dependencies
         run: npm ci
 
@@ -38,7 +41,7 @@ jobs:
         run: npm version ${{ steps.version.outputs.VERSION }} --workspaces --no-git-tag-version --allow-same-version
 
       - name: Publish SDK package
-        run: npm publish -w @mhriemers/banktivity-sdk --provenance
+        run: npm publish -w @mhriemers/banktivity-sdk
 
       - name: Publish MCP package
-        run: npm publish -w @mhriemers/banktivity-mcp --provenance
+        run: npm publish -w @mhriemers/banktivity-mcp
