@@ -4,7 +4,6 @@ import {
   TransactionRepository,
   LineItemRepository,
   TagRepository,
-  PayeeRepository,
   TransactionTemplateRepository,
   ImportRuleRepository,
   ScheduledTransactionRepository,
@@ -24,7 +23,6 @@ export class BanktivityDatabase {
   public readonly transactions: TransactionRepository;
   public readonly lineItems: LineItemRepository;
   public readonly tags: TagRepository;
-  public readonly payees: PayeeRepository;
   public readonly templates: TransactionTemplateRepository;
   public readonly importRules: ImportRuleRepository;
   public readonly scheduledTransactions: ScheduledTransactionRepository;
@@ -35,7 +33,6 @@ export class BanktivityDatabase {
     // Initialize repositories
     this.lineItems = new LineItemRepository(this.connection.instance);
     this.tags = new TagRepository(this.connection.instance);
-    this.payees = new PayeeRepository(this.connection.instance);
     this.templates = new TransactionTemplateRepository(this.connection.instance);
     this.importRules = new ImportRuleRepository(this.connection.instance);
     this.scheduledTransactions = new ScheduledTransactionRepository(this.connection.instance);
@@ -167,26 +164,6 @@ export class BanktivityDatabase {
 
   untagTransaction(transactionId: number, tagId: number) {
     return this.tags.untagTransaction(transactionId, tagId);
-  }
-
-  getPayees() {
-    return this.payees.getAll();
-  }
-
-  getPayeeById(payeeId: number) {
-    return this.payees.getById(payeeId);
-  }
-
-  createPayee(options: Parameters<PayeeRepository["create"]>[0]) {
-    return this.payees.create(options);
-  }
-
-  updatePayee(payeeId: number, updates: Parameters<PayeeRepository["update"]>[1]) {
-    return this.payees.update(payeeId, updates);
-  }
-
-  deletePayee(payeeId: number) {
-    return this.payees.delete(payeeId);
   }
 
   getTransactionTemplates() {

@@ -49,19 +49,6 @@ export interface Tag {
   name: string;
 }
 
-export interface Payee {
-  id: number;
-  name: string;
-  phone: string | null;
-  street1: string | null;
-  street2: string | null;
-  street3: string | null;
-  city: string | null;
-  state: string | null;
-  postalCode: string | null;
-  countryCode: string | null;
-}
-
 export interface TransactionTemplate {
   id: number;
   title: string;
@@ -141,30 +128,6 @@ export interface CreateAccountInput {
   accountClass: number;
   currencyCode?: string;
   hidden?: boolean;
-}
-
-export interface CreatePayeeInput {
-  name: string;
-  phone?: string;
-  street1?: string;
-  street2?: string;
-  street3?: string;
-  city?: string;
-  state?: string;
-  postalCode?: string;
-  countryCode?: string;
-}
-
-export interface UpdatePayeeInput {
-  name?: string;
-  phone?: string;
-  street1?: string;
-  street2?: string;
-  street3?: string;
-  city?: string;
-  state?: string;
-  postalCode?: string;
-  countryCode?: string;
 }
 
 export interface CreateTransactionTemplateInput {

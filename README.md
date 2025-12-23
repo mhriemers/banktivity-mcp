@@ -9,7 +9,7 @@ An MCP (Model Context Protocol) server that provides access to Banktivity person
 - Query and search transactions
 - Get spending/income breakdown by category
 - Calculate net worth
-- View tags, payees, and transaction templates
+- View tags and transaction templates
 - List import rules and scheduled transactions
 
 ### Write Operations
@@ -18,7 +18,6 @@ An MCP (Model Context Protocol) server that provides access to Banktivity person
 - Create accounts and tags
 - Tag/untag transactions
 - Reconcile transactions
-- Manage payees
 - Manage transaction templates
 - Manage import rules
 - Manage scheduled transactions
@@ -102,16 +101,6 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
 | `get_tags` | List all tags |
 | `create_tag` | Create a new tag |
 | `tag_transaction` | Add or remove a tag from a transaction |
-
-### Payee Tools
-
-| Tool | Description |
-|------|-------------|
-| `list_payees` | List all payees with contact information |
-| `get_payee` | Get a specific payee by ID |
-| `create_payee` | Create a new payee |
-| `update_payee` | Update payee information |
-| `delete_payee` | Delete a payee |
 
 ### Transaction Template Tools
 

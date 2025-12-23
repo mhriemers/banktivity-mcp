@@ -5,7 +5,6 @@ import { registerAccountTools } from "./accounts.js";
 import { registerTransactionTools } from "./transactions.js";
 import { registerLineItemTools } from "./line-items.js";
 import { registerTagTools } from "./tags.js";
-import { registerPayeeTools } from "./payees.js";
 import { registerTemplateTools } from "./templates.js";
 import { registerImportRuleTools } from "./import-rules.js";
 import { registerScheduledTransactionTools } from "./scheduled-transactions.js";
@@ -18,7 +17,6 @@ export function registerAllTools(server: McpServer, db: BanktivityDatabase): voi
   registerTransactionTools(server, db);
   registerLineItemTools(server, db);
   registerTagTools(server, db);
-  registerPayeeTools(server, db);
   registerTemplateTools(server, db);
   registerImportRuleTools(server, db);
   registerScheduledTransactionTools(server, db);
