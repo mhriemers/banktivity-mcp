@@ -5,7 +5,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
+    "build": "npm run build -w @mhriemers/banktivity-sdk && npm run build -w @mhriemers/banktivity-mcp",
     "clean": "npm run clean --workspaces --if-present",
     "start": "npm run start -w @mhriemers/banktivity-mcp",
     "version": "npm version --workspaces --no-git-tag-version"
