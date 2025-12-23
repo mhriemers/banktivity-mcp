@@ -39,10 +39,6 @@ jobs:
 
       - name: Publish SDK package
         run: npm publish -w @mhriemers/banktivity-sdk --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish MCP package
         run: npm publish -w @mhriemers/banktivity-mcp --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
