@@ -38,7 +38,7 @@ jobs:
         run: npm version ${{ steps.version.outputs.VERSION }} --workspaces --no-git-tag-version --allow-same-version
 
       - name: Publish SDK package
-        run: npm publish -w @mhriemers/banktivity-sdk --provenance --access public
+        run: npm publish -w @mhriemers/banktivity-sdk
 
       - name: Publish MCP package
-        run: npm publish -w @mhriemers/banktivity-mcp --provenance --access public
+        run: npm publish -w @mhriemers/banktivity-mcp
