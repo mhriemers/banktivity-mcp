@@ -29,7 +29,9 @@
   "homepage": "https://github.com/mhriemers/banktivity-mcp/tree/main/packages/sdk#readme",
   "scripts": {
     "build": "tsc",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [
     "banktivity",

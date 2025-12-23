@@ -8,9 +8,14 @@
     "build": "npm run build -w @mhriemers/banktivity-sdk && npm run build -w @mhriemers/banktivity-mcp",
     "clean": "npm run clean --workspaces --if-present",
     "start": "npm run start -w @mhriemers/banktivity-mcp",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "version": "npm version --workspaces --no-git-tag-version"
   },
   "devDependencies": {
-    "typescript": "^5.7.2"
+    "@vitest/coverage-v8": "^4.0.16",
+    "typescript": "^5.7.2",
+    "vitest": "^4.0.16"
   }
 }
