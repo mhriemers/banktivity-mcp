@@ -1,0 +1,4 @@
+node_modules/
+dist/
+*.bank8
+.DS_Store
