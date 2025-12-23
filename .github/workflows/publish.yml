@@ -20,7 +20,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
 
@@ -38,7 +38,7 @@ jobs:
         run: npm version ${{ steps.version.outputs.VERSION }} --workspaces --no-git-tag-version --allow-same-version
 
       - name: Publish SDK package
-        run: npm publish -w @mhriemers/banktivity-sdk
+        run: npm publish -w @mhriemers/banktivity-sdk --provenance
 
       - name: Publish MCP package
-        run: npm publish -w @mhriemers/banktivity-mcp
+        run: npm publish -w @mhriemers/banktivity-mcp --provenance
