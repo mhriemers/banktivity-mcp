@@ -134,7 +134,7 @@ describe("Account Integration Tests", () => {
       expect(balance).toBe(0);
     });
 
-    it("should calculate correct balance from transactions", () => {
+    it("should return running balance from the most recent line item", () => {
       transactionRepo.create({
         title: "Deposit",
         date: "2024-01-01",
@@ -155,6 +155,70 @@ describe("Account Integration Tests", () => {
 
       const balance = accountRepo.getBalance(testData.accounts.checking);
       expect(balance).toBe(750);
+    });
+
+    it("should return correct balance for multi-currency account (use ZPRUNNINGBALANCE, not SUM of ZPTRANSACTIONAMOUNT)", () => {
+      // Simulate a USD account receiving transfers from a KZT account.
+      // ZPTRANSACTIONAMOUNT is in the transaction currency (KZT), while
+      // ZPRUNNINGBALANCE is in the account's own currency (USD).
+      // The old SUM(ZPTRANSACTIONAMOUNT) approach would return 960000 (KZT sum),
+      // but the correct answer is the last ZPRUNNINGBALANCE = 2100 (USD).
+
+      const usdCurrencyId = db.prepare(
+        `INSERT INTO ZCURRENCY (Z_ENT, Z_OPT, ZPCODE, ZPNAME) VALUES (4, 0, 'USD', 'US Dollar')`
+      ).run().lastInsertRowid as number;
+
+      const kztCurrencyId = db.prepare(
+        `INSERT INTO ZCURRENCY (Z_ENT, Z_OPT, ZPCODE, ZPNAME) VALUES (4, 0, 'KZT', 'Kazakhstani Tenge')`
+      ).run().lastInsertRowid as number;
+
+      // Create USD savings account
+      const usdAccountId = db.prepare(`
+        INSERT INTO ZACCOUNT (Z_ENT, Z_OPT, ZCURRENCY, ZPACCOUNTCLASS,
+          ZPNAME, ZPFULLNAME, ZPCREATIONTIME, ZPMODIFICATIONDATE, ZPUNIQUEID)
+        VALUES (?, 0, ?, ?, 'USD Savings', 'USD Savings', 0, 0, 'test-usd-acct')
+      `).run(6, usdCurrencyId, 1).lastInsertRowid as number;
+
+      // Create KZT checking account (source of transfers)
+      const kztAccountId = db.prepare(`
+        INSERT INTO ZACCOUNT (Z_ENT, Z_OPT, ZCURRENCY, ZPACCOUNTCLASS,
+          ZPNAME, ZPFULLNAME, ZPCREATIONTIME, ZPMODIFICATIONDATE, ZPUNIQUEID)
+        VALUES (?, 0, ?, ?, 'KZT Checking', 'KZT Checking', 0, 0, 'test-kzt-acct')
+      `).run(6, kztCurrencyId, 2).lastInsertRowid as number;
+
+      // Transaction 1: Transfer 480000 KZT -> USD account (= $1000 USD at rate 480)
+      const tx1Id = db.prepare(`
+        INSERT INTO ZTRANSACTION (Z_ENT, Z_OPT, ZPADJUSTMENT, ZPCURRENCY,
+          ZPCREATIONTIME, ZPDATE, ZPMODIFICATIONDATE, ZPTITLE, ZPUNIQUEID, ZPCLEARED, ZPVOID)
+        VALUES (?, 1, 0, ?, 0, 100, 0, 'Transfer 1', 'tx1-uuid', 0, 0)
+      `).run(5, kztCurrencyId).lastInsertRowid as number;
+
+      // Line item on USD account: amount is in KZT (480000), running balance is in USD (1000)
+      db.prepare(`
+        INSERT INTO ZLINEITEM (Z_ENT, Z_OPT, ZPACCOUNT, Z1_PACCOUNT, ZPTRANSACTION,
+          ZPINTRADAYSORTINDEX, ZPCREATIONTIME, ZPTRANSACTIONAMOUNT,
+          ZPEXCHANGERATE, ZPRUNNINGBALANCE, ZPUNIQUEID, ZPCLEARED)
+        VALUES (?, 1, ?, 6, ?, 0, 0, 480000, 0.002083, 1000, 'li1-uuid', 0)
+      `).run(19, usdAccountId, tx1Id);
+
+      // Transaction 2: Transfer 480000 KZT -> USD account (= $1100 USD at rate ~436)
+      const tx2Id = db.prepare(`
+        INSERT INTO ZTRANSACTION (Z_ENT, Z_OPT, ZPADJUSTMENT, ZPCURRENCY,
+          ZPCREATIONTIME, ZPDATE, ZPMODIFICATIONDATE, ZPTITLE, ZPUNIQUEID, ZPCLEARED, ZPVOID)
+        VALUES (?, 1, 0, ?, 0, 200, 0, 'Transfer 2', 'tx2-uuid', 0, 0)
+      `).run(5, kztCurrencyId).lastInsertRowid as number;
+
+      // Line item on USD account: amount is in KZT (480000), running balance is in USD (2100)
+      db.prepare(`
+        INSERT INTO ZLINEITEM (Z_ENT, Z_OPT, ZPACCOUNT, Z1_PACCOUNT, ZPTRANSACTION,
+          ZPINTRADAYSORTINDEX, ZPCREATIONTIME, ZPTRANSACTIONAMOUNT,
+          ZPEXCHANGERATE, ZPRUNNINGBALANCE, ZPUNIQUEID, ZPCLEARED)
+        VALUES (?, 1, ?, 6, ?, 0, 0, 480000, 0.002292, 2100, 'li2-uuid', 0)
+      `).run(19, usdAccountId, tx2Id);
+
+      const balance = accountRepo.getBalance(usdAccountId);
+      // Must be 2100 (USD running balance), NOT 960000 (sum of KZT amounts)
+      expect(balance).toBe(2100);
     });
   });
 

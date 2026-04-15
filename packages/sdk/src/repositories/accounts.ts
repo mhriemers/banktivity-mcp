@@ -119,15 +119,25 @@ export class AccountRepository extends BaseRepository {
 
   /**
    * Get account balance
+   *
+   * Uses ZPRUNNINGBALANCE from the most recent line item rather than
+   * SUM(ZPTRANSACTIONAMOUNT). ZPTRANSACTIONAMOUNT is stored in the
+   * *transaction* currency (e.g. KZT for a transfer originating from a
+   * KZT account), so summing it produces wildly wrong numbers for
+   * multi-currency accounts. ZPRUNNINGBALANCE is always in the account's
+   * own currency and is maintained by Banktivity on every operation.
    */
   getBalance(accountId: number): number {
     const sql = `
-      SELECT COALESCE(SUM(ZPTRANSACTIONAMOUNT), 0) as balance
-      FROM ZLINEITEM
-      WHERE ZPACCOUNT = ?
+      SELECT li.ZPRUNNINGBALANCE as balance
+      FROM ZLINEITEM li
+      JOIN ZTRANSACTION t ON t.Z_PK = li.ZPTRANSACTION
+      WHERE li.ZPACCOUNT = ?
+      ORDER BY t.ZPDATE DESC, li.Z_PK DESC
+      LIMIT 1
     `;
-    const row = this.db.prepare(sql).get(accountId) as { balance: number };
-    return row.balance;
+    const row = this.db.prepare(sql).get(accountId) as { balance: number } | undefined;
+    return row?.balance ?? 0;
   }
 
   /**

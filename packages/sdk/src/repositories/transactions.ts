@@ -179,12 +179,14 @@ export class TransactionRepository extends BaseRepository {
     const affectedAccounts = new Set<number>();
 
     this.runTransaction(() => {
+      // Z_OPT starts at 1 (Core Data optimistic-lock counter on creation)
+      // ZPADJUSTMENT must be 0 (non-NULL) to match Banktivity-native rows.
       const insertTransaction = this.db.prepare(`
         INSERT INTO ZTRANSACTION (
-          Z_ENT, Z_OPT, ZPTRANSACTIONTYPE, ZPCURRENCY,
+          Z_ENT, Z_OPT, ZPADJUSTMENT, ZPTRANSACTIONTYPE, ZPCURRENCY,
           ZPCREATIONTIME, ZPDATE, ZPMODIFICATIONDATE,
           ZPTITLE, ZPNOTE, ZPUNIQUEID, ZPCLEARED, ZPVOID
-        ) VALUES (?, 0, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
+        ) VALUES (?, 1, 0, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
       `);
 
       const txResult = insertTransaction.run(
@@ -200,6 +202,14 @@ export class TransactionRepository extends BaseRepository {
       );
 
       result.transactionId = txResult.lastInsertRowid as number;
+
+      // Keep Core Data's Z_PRIMARYKEY.Z_MAX in sync so Banktivity
+      // doesn't treat newly-inserted rows as ghost data and purge them.
+      this.db
+        .prepare(
+          `UPDATE Z_PRIMARYKEY SET Z_MAX = ? WHERE Z_NAME = 'Transaction' AND Z_MAX < ?`
+        )
+        .run(result.transactionId, result.transactionId);
 
       for (const item of input.lineItems) {
         const lineItemId = this.lineItems.create(

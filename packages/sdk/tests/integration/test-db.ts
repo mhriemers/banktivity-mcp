@@ -67,6 +67,7 @@ export function createTestDatabase(): Database.Database {
       Z_PK INTEGER PRIMARY KEY AUTOINCREMENT,
       Z_ENT INTEGER,
       Z_OPT INTEGER,
+      ZPADJUSTMENT INTEGER DEFAULT 0,
       ZPTRANSACTIONTYPE INTEGER,
       ZPCURRENCY INTEGER,
       ZPCREATIONTIME REAL,
@@ -87,7 +88,9 @@ export function createTestDatabase(): Database.Database {
       Z_ENT INTEGER,
       Z_OPT INTEGER,
       ZPACCOUNT INTEGER,
+      Z1_PACCOUNT INTEGER,
       ZPTRANSACTION INTEGER,
+      ZPINTRADAYSORTINDEX INTEGER DEFAULT 0,
       ZPCREATIONTIME REAL,
       ZPTRANSACTIONAMOUNT REAL,
       ZPEXCHANGERATE REAL,
@@ -258,6 +261,10 @@ export function seedTestDatabase(db: Database.Database): TestData {
     ) VALUES (?, 0, ?, ?, 'Salary', 'Income:Salary', ?, ?, ?)
   `).run(Z_ENT.CATEGORY, currencyId, ACCOUNT_CLASS.INCOME, now, now, generateUUID());
   const incomeAccountId = incomeResult.lastInsertRowid as number;
+
+  // Seed Z_PRIMARYKEY so SDK can keep Z_MAX in sync (Core Data ghost-data guard)
+  db.prepare(`INSERT INTO Z_PRIMARYKEY (Z_ENT, Z_NAME, Z_SUPER, Z_MAX) VALUES (?, 'Transaction', 0, 0)`).run(Z_ENT.TRANSACTION);
+  db.prepare(`INSERT INTO Z_PRIMARYKEY (Z_ENT, Z_NAME, Z_SUPER, Z_MAX) VALUES (?, 'LineItem', 0, 0)`).run(Z_ENT.LINEITEM);
 
   return {
     currencyId,
