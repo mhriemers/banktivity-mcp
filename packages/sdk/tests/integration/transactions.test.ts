@@ -406,6 +406,52 @@ describe("Transaction Integration Tests", () => {
     });
   });
 
+  describe("Z_PRIMARYKEY.Z_MAX tracking", () => {
+    it("should update Z_MAX for Transaction and LineItem after create", () => {
+      const before = db.prepare(
+        `SELECT Z_MAX FROM Z_PRIMARYKEY WHERE Z_NAME = 'Transaction'`
+      ).get() as { Z_MAX: number };
+      expect(before.Z_MAX).toBe(0);
+
+      const result = transactionRepo.create({
+        title: "Z_MAX Test",
+        date: "2024-01-15",
+        lineItems: [
+          { accountId: testData.accounts.checking, amount: -25.00 },
+          { accountId: testData.accounts.groceries, amount: 25.00 },
+        ],
+      });
+
+      const txMax = db.prepare(
+        `SELECT Z_MAX FROM Z_PRIMARYKEY WHERE Z_NAME = 'Transaction'`
+      ).get() as { Z_MAX: number };
+      expect(txMax.Z_MAX).toBe(result.transactionId);
+
+      const liMax = db.prepare(
+        `SELECT Z_MAX FROM Z_PRIMARYKEY WHERE Z_NAME = 'LineItem'`
+      ).get() as { Z_MAX: number };
+      expect(liMax.Z_MAX).toBe(Math.max(...result.lineItemIds));
+    });
+
+    it("should only increase Z_MAX, never decrease it", () => {
+      // Pre-set Z_MAX to a high value
+      db.prepare(
+        `UPDATE Z_PRIMARYKEY SET Z_MAX = 999999 WHERE Z_NAME = 'Transaction'`
+      ).run();
+
+      transactionRepo.create({
+        title: "Should not lower Z_MAX",
+        date: "2024-01-15",
+        lineItems: [{ accountId: testData.accounts.checking, amount: -10.00 }],
+      });
+
+      const txMax = db.prepare(
+        `SELECT Z_MAX FROM Z_PRIMARYKEY WHERE Z_NAME = 'Transaction'`
+      ).get() as { Z_MAX: number };
+      expect(txMax.Z_MAX).toBe(999999);
+    });
+  });
+
   describe("tagging transactions", () => {
     it("should tag all line items in a transaction", () => {
       const { transactionId } = transactionRepo.create({

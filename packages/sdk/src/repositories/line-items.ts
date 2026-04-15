@@ -109,6 +109,16 @@ export class LineItemRepository extends BaseRepository {
 
   /**
    * Create a new line item
+   *
+   * IMPORTANT: Banktivity stores a polymorphic to-one relationship to ZACCOUNT.
+   * In the SQLite/Core Data backing store this is represented by TWO columns:
+   *   - ZPACCOUNT  — foreign key (Z_PK of the account row)
+   *   - Z1_PACCOUNT — Z_ENT of that account (the entity-class discriminator)
+   *
+   * Omitting Z1_PACCOUNT leaves it NULL; when Core Data later tries to
+   * resolve the relationship, `_validateToOnes` / `newObjectIDForToOne` hits
+   * an NSNotFound index and Banktivity crashes with NSRangeException.
+   * ZPINTRADAYSORTINDEX must also be non-NULL (default 0) for sort queries.
    */
   create(
     transactionId: number,
@@ -119,12 +129,23 @@ export class LineItemRepository extends BaseRepository {
     const now = nowAsCoreData();
     const uuid = generateUUID();
 
+    // Look up the account's Z_ENT so we can populate Z1_PACCOUNT.
+    const accountEntRow = this.db
+      .prepare(`SELECT Z_ENT FROM ZACCOUNT WHERE Z_PK = ?`)
+      .get(accountId) as { Z_ENT: number } | undefined;
+
+    if (!accountEntRow) {
+      throw new Error(
+        `Cannot create line item: account ${accountId} not found in ZACCOUNT`
+      );
+    }
+
     const sql = `
       INSERT INTO ZLINEITEM (
-        Z_ENT, Z_OPT, ZPACCOUNT, ZPTRANSACTION,
-        ZPCREATIONTIME, ZPTRANSACTIONAMOUNT, ZPEXCHANGERATE,
-        ZPRUNNINGBALANCE, ZPMEMO, ZPUNIQUEID, ZPCLEARED
-      ) VALUES (?, 0, ?, ?, ?, ?, 1.0, 0, ?, ?, 0)
+        Z_ENT, Z_OPT, ZPACCOUNT, Z1_PACCOUNT, ZPTRANSACTION,
+        ZPINTRADAYSORTINDEX, ZPCREATIONTIME, ZPTRANSACTIONAMOUNT,
+        ZPEXCHANGERATE, ZPRUNNINGBALANCE, ZPMEMO, ZPUNIQUEID, ZPCLEARED
+      ) VALUES (?, 1, ?, ?, ?, 0, ?, ?, 1.0, 0, ?, ?, 0)
     `;
 
     const result = this.db
@@ -132,6 +153,7 @@ export class LineItemRepository extends BaseRepository {
       .run(
         Z_ENT.LINEITEM,
         accountId,
+        accountEntRow.Z_ENT,
         transactionId,
         now,
         amount,
@@ -139,7 +161,17 @@ export class LineItemRepository extends BaseRepository {
         uuid
       );
 
-    return result.lastInsertRowid as number;
+    // Keep Core Data's Z_PRIMARYKEY.Z_MAX in sync with the actual max Z_PK.
+    // Banktivity uses this to detect "known" rows; any Z_PK > Z_MAX is treated
+    // as a ghost and gets purged on next save.
+    const newId = result.lastInsertRowid as number;
+    this.db
+      .prepare(
+        `UPDATE Z_PRIMARYKEY SET Z_MAX = ? WHERE Z_NAME = 'LineItem' AND Z_MAX < ?`
+      )
+      .run(newId, newId);
+
+    return newId;
   }
 
   /**
