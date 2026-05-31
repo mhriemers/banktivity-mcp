@@ -1,5 +1,36 @@
 import Database from "better-sqlite3";
+import fs from "fs";
 import path from "path";
+
+/**
+ * Resolve the path to the .bank8 directory, handling both the old format
+ * (BANKTIVITY_FILE_PATH points directly to the .bank8 package) and the new
+ * organizer format (BANKTIVITY_FILE_PATH points to an outer container that
+ * holds a numbered .bank8 subdirectory, e.g. 1.bank8/).
+ */
+function resolveBankPath(filePath: string): string {
+  const directDb = path.join(filePath, "StoreContent", "core.sql");
+  if (fs.existsSync(directDb)) {
+    return filePath;
+  }
+
+  // New organizer format: look for a *.bank8 subdirectory
+  try {
+    const entries = fs.readdirSync(filePath);
+    const inner = entries.find((e) => e.endsWith(".bank8"));
+    if (inner) {
+      const innerPath = path.join(filePath, inner);
+      const innerDb = path.join(innerPath, "StoreContent", "core.sql");
+      if (fs.existsSync(innerDb)) {
+        return innerPath;
+      }
+    }
+  } catch {
+    // Fall through to let Database throw a descriptive error
+  }
+
+  return filePath;
+}
 
 /**
  * Database connection wrapper
@@ -8,7 +39,8 @@ export class DatabaseConnection {
   private db: Database.Database;
 
   constructor(bankFilePath: string, readonly = false) {
-    const dbPath = path.join(bankFilePath, "StoreContent", "core.sql");
+    const resolvedPath = resolveBankPath(bankFilePath);
+    const dbPath = path.join(resolvedPath, "StoreContent", "core.sql");
     this.db = new Database(dbPath, { readonly });
   }
 

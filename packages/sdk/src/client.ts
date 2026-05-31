@@ -14,7 +14,9 @@ import {
  */
 export interface BanktivityClientOptions {
   /**
-   * Path to the .bank8 file
+   * Path to the Banktivity file. Accepts either:
+   * - A `.bank8` package directory (legacy format)
+   * - A Banktivity organizer directory containing a numbered `.bank8` subdirectory (new format)
    */
   filePath: string;
 

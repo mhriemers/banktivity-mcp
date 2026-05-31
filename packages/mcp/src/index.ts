@@ -9,7 +9,7 @@ const BANK_FILE_PATH = process.env.BANKTIVITY_FILE_PATH;
 
 if (!BANK_FILE_PATH) {
   console.error("Error: BANKTIVITY_FILE_PATH environment variable is required");
-  console.error("Set it to the path of your .bank8 file");
+  console.error("Set it to the path of your .bank8 file or Banktivity organizer");
   process.exit(1);
 }
 
