@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import Database from "better-sqlite3";
-import { createTestDatabase, seedTestDatabase, type TestData } from "./test-db.js";
+import { createTestDatabase, seedTestDatabase, createMockConnection, type TestData } from "./test-db.js";
 import { TransactionTemplateRepository } from "../../src/repositories/templates.js";
 
 describe("Transaction Template Integration Tests", () => {
@@ -11,7 +11,8 @@ describe("Transaction Template Integration Tests", () => {
   beforeEach(() => {
     db = createTestDatabase();
     testData = seedTestDatabase(db);
-    templateRepo = new TransactionTemplateRepository(db);
+    const connection = createMockConnection(db);
+    templateRepo = new TransactionTemplateRepository(db, connection.entityTypes, connection.tagJunctionColumn);
   });
 
   afterEach(() => {

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import Database from "better-sqlite3";
-import { createTestDatabase, seedTestDatabase, type TestData } from "./test-db.js";
+import { createTestDatabase, seedTestDatabase, createMockConnection, type TestData } from "./test-db.js";
 import { ImportRuleRepository } from "../../src/repositories/import-rules.js";
 import { TransactionTemplateRepository } from "../../src/repositories/templates.js";
 
@@ -14,8 +14,9 @@ describe("Import Rule Integration Tests", () => {
   beforeEach(() => {
     db = createTestDatabase();
     testData = seedTestDatabase(db);
-    importRuleRepo = new ImportRuleRepository(db);
-    templateRepo = new TransactionTemplateRepository(db);
+    const connection = createMockConnection(db);
+    importRuleRepo = new ImportRuleRepository(db, connection.entityTypes, connection.tagJunctionColumn);
+    templateRepo = new TransactionTemplateRepository(db, connection.entityTypes, connection.tagJunctionColumn);
 
     // Create a template for testing
     templateId = templateRepo.create({

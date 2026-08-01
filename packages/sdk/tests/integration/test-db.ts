@@ -81,6 +81,9 @@ export function createTestDatabase(): Database.Database {
   `);
 
   // Create line item table
+  // Z1_PACCOUNT: Core Data reverse-relationship back-reference used by
+  //   IGGCAccountingGroupExtension on startup (2=income/expense, 3=balance-sheet).
+  // ZPINTRADAYSORTINDEX: intra-day ordering column; must not be NULL.
   db.exec(`
     CREATE TABLE ZLINEITEM (
       Z_PK INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -95,6 +98,8 @@ export function createTestDatabase(): Database.Database {
       ZPMEMO TEXT,
       ZPUNIQUEID TEXT,
       ZPCLEARED INTEGER DEFAULT 0,
+      Z1_PACCOUNT INTEGER,
+      ZPINTRADAYSORTINDEX INTEGER DEFAULT 0,
       FOREIGN KEY (ZPACCOUNT) REFERENCES ZACCOUNT(Z_PK),
       FOREIGN KEY (ZPTRANSACTION) REFERENCES ZTRANSACTION(Z_PK)
     )
@@ -206,6 +211,33 @@ export function createTestDatabase(): Database.Database {
 export function seedTestDatabase(db: Database.Database): TestData {
   const now = nowAsCoreData();
 
+  // Seed the Core Data primary-key counter table.
+  // Each entity row tracks the highest Z_PK used so Banktivity can allocate
+  // new IDs and validate the database on open.
+  // We use the Z_ENT values from constants.ts (originally designed for Bank8)
+  // since the test schema uses those throughout.
+  const pkEntities: Array<[string, number]> = [
+    ["Account", 1],
+    ["Category", 2],
+    ["PrimaryAccount", 3],
+    ["LineItem", 19],
+    ["LineItemTemplate", 21],
+    ["RecurringTransaction", 35],
+    ["Tag", 47],
+    ["TemplateSelector", 48],
+    ["ImportSourceTemplateSelector", 49],
+    ["ScheduledTemplateSelector", 52],
+    ["Transaction", 53],
+    ["TransactionTemplate", 54],
+    ["TransactionType", 55],
+  ];
+  const insertPk = db.prepare(
+    `INSERT INTO Z_PRIMARYKEY (Z_ENT, Z_NAME, Z_SUPER, Z_MAX) VALUES (?, ?, 0, 0)`
+  );
+  for (const [name, ent] of pkEntities) {
+    insertPk.run(ent, name);
+  }
+
   // Insert default currency
   const currencyResult = db.prepare(`
     INSERT INTO ZCURRENCY (Z_ENT, Z_OPT, ZPCODE, ZPNAME)
@@ -284,8 +316,17 @@ export interface TestData {
  * Create a mock DatabaseConnection-like object for testing
  */
 export function createMockConnection(db: Database.Database) {
+  // Load entity types from Z_PRIMARYKEY (same as DatabaseConnection does)
+  const rows = db
+    .prepare(`SELECT Z_NAME, Z_ENT FROM Z_PRIMARYKEY`)
+    .all() as Array<{ Z_NAME: string; Z_ENT: number }>;
+  const entityTypes = Object.fromEntries(rows.map((r) => [r.Z_NAME, r.Z_ENT]));
+  const tagJunctionColumn = `Z_${entityTypes.Tag}PTAGS`;
+
   return {
     instance: db,
+    entityTypes,
+    tagJunctionColumn,
     close: () => db.close(),
     getDefaultCurrencyId: () => {
       const row = db.prepare("SELECT Z_PK as id FROM ZCURRENCY LIMIT 1").get() as { id: number } | undefined;

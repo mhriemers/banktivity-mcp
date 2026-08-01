@@ -14,7 +14,7 @@ describe("Line Item Integration Tests", () => {
     db = createTestDatabase();
     testData = seedTestDatabase(db);
     const connection = createMockConnection(db);
-    lineItemRepo = new LineItemRepository(db);
+    lineItemRepo = new LineItemRepository(db, connection.entityTypes, connection.tagJunctionColumn);
     transactionRepo = new TransactionRepository(connection as any, lineItemRepo);
   });
 

@@ -4,7 +4,6 @@ import {
   CreateImportRuleInput,
   UpdateImportRuleInput,
 } from "../types.js";
-import { Z_ENT } from "../constants.js";
 import { nowAsCoreData } from "../utils/date.js";
 import { generateUUID } from "../utils/uuid.js";
 
@@ -32,7 +31,7 @@ export class ImportRuleRepository extends BaseRepository {
 
     return this.db
       .prepare(sql)
-      .all(Z_ENT.IMPORT_SOURCE_TEMPLATE_SELECTOR) as ImportRule[];
+      .all(this.entityTypes.ImportSourceTemplateSelector) as ImportRule[];
   }
 
   /**
@@ -54,7 +53,7 @@ export class ImportRuleRepository extends BaseRepository {
 
     const row = this.db
       .prepare(sql)
-      .get(ruleId, Z_ENT.IMPORT_SOURCE_TEMPLATE_SELECTOR) as
+      .get(ruleId, this.entityTypes.ImportSourceTemplateSelector) as
       | ImportRule
       | undefined;
     return row ?? null;
@@ -76,7 +75,7 @@ export class ImportRuleRepository extends BaseRepository {
     `;
 
     const result = this.db.prepare(sql).run(
-      Z_ENT.IMPORT_SOURCE_TEMPLATE_SELECTOR,
+      this.entityTypes.ImportSourceTemplateSelector,
       input.templateId,
       now,
       now,
@@ -100,7 +99,7 @@ export class ImportRuleRepository extends BaseRepository {
     };
 
     const changes = this.executeUpdate("ZTEMPLATESELECTOR", ruleId, updates, columnMap, {
-      additionalWhere: `Z_ENT = ${Z_ENT.IMPORT_SOURCE_TEMPLATE_SELECTOR}`,
+      additionalWhere: `Z_ENT = ${this.entityTypes.ImportSourceTemplateSelector}`,
     });
 
     return changes > 0;
@@ -113,7 +112,7 @@ export class ImportRuleRepository extends BaseRepository {
     const sql = `DELETE FROM ZTEMPLATESELECTOR WHERE Z_PK = ? AND Z_ENT = ?`;
     const result = this.db
       .prepare(sql)
-      .run(ruleId, Z_ENT.IMPORT_SOURCE_TEMPLATE_SELECTOR);
+      .run(ruleId, this.entityTypes.ImportSourceTemplateSelector);
     return result.changes > 0;
   }
 

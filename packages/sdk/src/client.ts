@@ -97,13 +97,16 @@ export class BanktivityClient {
       options.readonly ?? false
     );
 
+    const entityTypes = this.connection.entityTypes;
+    const tagJunctionColumn = this.connection.tagJunctionColumn;
+
     // Initialize repositories
-    this.lineItems = new LineItemRepository(this.connection.instance);
-    this.tags = new TagRepository(this.connection.instance);
-    this.templates = new TransactionTemplateRepository(this.connection.instance);
-    this.importRules = new ImportRuleRepository(this.connection.instance);
+    this.lineItems = new LineItemRepository(this.connection.instance, entityTypes, tagJunctionColumn);
+    this.tags = new TagRepository(this.connection.instance, entityTypes, tagJunctionColumn);
+    this.templates = new TransactionTemplateRepository(this.connection.instance, entityTypes, tagJunctionColumn);
+    this.importRules = new ImportRuleRepository(this.connection.instance, entityTypes, tagJunctionColumn);
     this.scheduledTransactions = new ScheduledTransactionRepository(
-      this.connection.instance
+      this.connection.instance, entityTypes, tagJunctionColumn
     );
 
     // These repositories have dependencies

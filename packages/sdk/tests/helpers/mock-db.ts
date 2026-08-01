@@ -1,5 +1,30 @@
 import { vi } from "vitest";
 import type Database from "better-sqlite3";
+import type { EntityTypes } from "../../src/connection.js";
+
+/**
+ * Default mock entity types for unit testing.
+ * Uses the same values seeded in the integration test Z_PRIMARYKEY table.
+ */
+export const mockEntityTypes: EntityTypes = {
+  Account: 1,
+  Category: 2,
+  PrimaryAccount: 3,
+  LineItem: 19,
+  LineItemTemplate: 21,
+  Payee: 31,
+  PayeeInfo: 33,
+  RecurringTransaction: 35,
+  Tag: 47,
+  TemplateSelector: 48,
+  ImportSourceTemplateSelector: 49,
+  ScheduledTemplateSelector: 52,
+  Transaction: 53,
+  TransactionTemplate: 54,
+  TransactionType: 55,
+};
+
+export const mockTagJunctionColumn = `Z_${mockEntityTypes.Tag}PTAGS`;
 
 export interface MockStatement {
   all: ReturnType<typeof vi.fn>;

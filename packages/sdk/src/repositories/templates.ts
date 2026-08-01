@@ -5,7 +5,6 @@ import {
   CreateTransactionTemplateInput,
   UpdateTransactionTemplateInput,
 } from "../types.js";
-import { Z_ENT } from "../constants.js";
 import { nowAsCoreData, coreDataToISO } from "../utils/date.js";
 import { generateUUID } from "../utils/uuid.js";
 
@@ -100,7 +99,7 @@ export class TransactionTemplateRepository extends BaseRepository {
       `);
 
       const result = insertTemplate.run(
-        Z_ENT.TRANSACTION_TEMPLATE,
+        this.entityTypes.TransactionTemplate,
         now,
         now,
         input.amount,
@@ -111,6 +110,7 @@ export class TransactionTemplateRepository extends BaseRepository {
       );
 
       templateId = result.lastInsertRowid as number;
+      this.updatePrimaryKey("TransactionTemplate", templateId);
 
       if (input.lineItems && input.lineItems.length > 0) {
         const insertLineItem = this.db.prepare(`
@@ -122,7 +122,7 @@ export class TransactionTemplateRepository extends BaseRepository {
 
         for (const item of input.lineItems) {
           insertLineItem.run(
-            Z_ENT.LINEITEM_TEMPLATE,
+            this.entityTypes.LineItemTemplate,
             templateId,
             now,
             item.amount,

@@ -2,11 +2,22 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Track constructor calls and mock instance
 let constructorCalls: Array<{ path: string; options: { readonly: boolean } }> = [];
+const mockPkRows = [
+  { Z_NAME: "Account", Z_ENT: 1 },
+  { Z_NAME: "Category", Z_ENT: 2 },
+  { Z_NAME: "PrimaryAccount", Z_ENT: 3 },
+  { Z_NAME: "LineItem", Z_ENT: 19 },
+  { Z_NAME: "Tag", Z_ENT: 47 },
+  { Z_NAME: "Transaction", Z_ENT: 53 },
+  { Z_NAME: "TransactionTemplate", Z_ENT: 54 },
+];
 const mockStatement = {
   get: vi.fn(),
+  all: vi.fn().mockReturnValue(mockPkRows),
 };
 const mockDbInstance = {
   prepare: vi.fn().mockReturnValue(mockStatement),
+  pragma: vi.fn(),
   close: vi.fn(),
 };
 
@@ -29,7 +40,9 @@ describe("DatabaseConnection", () => {
   beforeEach(() => {
     constructorCalls = [];
     mockStatement.get.mockReset();
+    mockStatement.all.mockReset().mockReturnValue(mockPkRows);
     mockDbInstance.close.mockReset();
+    mockDbInstance.pragma.mockReset();
     connection = new DatabaseConnection("/path/to/file.bank8");
   });
 
@@ -58,9 +71,20 @@ describe("DatabaseConnection", () => {
   });
 
   describe("close", () => {
-    it("should close the database connection", () => {
+    it("should checkpoint the WAL and close the database connection", () => {
       connection.close();
+      expect(mockDbInstance.pragma).toHaveBeenCalledWith('wal_checkpoint(TRUNCATE)');
       expect(mockDbInstance.close).toHaveBeenCalled();
+    });
+
+    it("should checkpoint before closing", () => {
+      const order: string[] = [];
+      mockDbInstance.pragma.mockImplementation(() => order.push("pragma"));
+      mockDbInstance.close.mockImplementation(() => order.push("close"));
+
+      connection.close();
+
+      expect(order).toEqual(["pragma", "close"]);
     });
   });
 

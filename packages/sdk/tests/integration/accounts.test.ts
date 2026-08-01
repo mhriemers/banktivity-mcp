@@ -18,7 +18,7 @@ describe("Account Integration Tests", () => {
     testData = seedTestDatabase(db);
     const connection = createMockConnection(db);
     accountRepo = new AccountRepository(connection as any);
-    lineItemRepo = new LineItemRepository(db);
+    lineItemRepo = new LineItemRepository(db, connection.entityTypes, connection.tagJunctionColumn);
     transactionRepo = new TransactionRepository(connection as any, lineItemRepo);
   });
 

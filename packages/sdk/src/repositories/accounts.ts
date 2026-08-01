@@ -7,7 +7,7 @@ import {
   DateRangeFilter,
   ListAccountsOptions,
 } from "../types.js";
-import { Z_ENT, ACCOUNT_CLASS, getAccountTypeName } from "../constants.js";
+import { ACCOUNT_CLASS, getAccountTypeName } from "../constants.js";
 import { nowAsCoreData, isoToCoreData } from "../utils/date.js";
 import { generateUUID } from "../utils/uuid.js";
 import { DatabaseConnection } from "../connection.js";
@@ -19,7 +19,7 @@ export class AccountRepository extends BaseRepository {
   private connection: DatabaseConnection;
 
   constructor(connection: DatabaseConnection) {
-    super(connection.instance);
+    super(connection.instance, connection.entityTypes, connection.tagJunctionColumn);
     this.connection = connection;
   }
 
@@ -149,7 +149,7 @@ export class AccountRepository extends BaseRepository {
     const isCategory =
       input.accountClass === ACCOUNT_CLASS.INCOME ||
       input.accountClass === ACCOUNT_CLASS.EXPENSE;
-    const entityType = isCategory ? Z_ENT.CATEGORY : Z_ENT.PRIMARY_ACCOUNT;
+    const entityType = isCategory ? this.entityTypes.Category : this.entityTypes.PrimaryAccount;
 
     const sql = `
       INSERT INTO ZACCOUNT (
@@ -172,7 +172,9 @@ export class AccountRepository extends BaseRepository {
       uuid
     );
 
-    return result.lastInsertRowid as number;
+    const newId = result.lastInsertRowid as number;
+    this.updatePrimaryKey("Account", newId);
+    return newId;
   }
 
   /**

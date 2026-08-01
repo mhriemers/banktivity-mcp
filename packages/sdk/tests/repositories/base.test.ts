@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { BaseRepository } from "../../src/repositories/base.js";
-import { createMockDatabase, createMockStatement, asDatabaseInstance } from "../helpers/mock-db.js";
+import { createMockDatabase, createMockStatement, asDatabaseInstance, mockEntityTypes, mockTagJunctionColumn } from "../helpers/mock-db.js";
 
 // Create a concrete implementation for testing
 class TestRepository extends BaseRepository {
@@ -33,7 +33,7 @@ describe("BaseRepository", () => {
 
   beforeEach(() => {
     mockDb = createMockDatabase();
-    repository = new TestRepository(asDatabaseInstance(mockDb));
+    repository = new TestRepository(asDatabaseInstance(mockDb), mockEntityTypes, mockTagJunctionColumn);
   });
 
   describe("executeUpdate", () => {

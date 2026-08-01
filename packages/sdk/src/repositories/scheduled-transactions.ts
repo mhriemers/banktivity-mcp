@@ -4,7 +4,6 @@ import {
   CreateScheduledTransactionInput,
   UpdateScheduledTransactionInput,
 } from "../types.js";
-import { Z_ENT } from "../constants.js";
 import { nowAsCoreData, coreDataToISO, isoToCoreData } from "../utils/date.js";
 import { generateUUID } from "../utils/uuid.js";
 
@@ -35,7 +34,7 @@ export class ScheduledTransactionRepository extends BaseRepository {
       ORDER BY ts.ZPSTARTDATE
     `;
 
-    const rows = this.db.prepare(sql).all(Z_ENT.SCHEDULED_TEMPLATE_SELECTOR) as Array<{
+    const rows = this.db.prepare(sql).all(this.entityTypes.ScheduledTemplateSelector) as Array<{
       id: number;
       templateId: number;
       templateTitle: string;
@@ -74,7 +73,7 @@ export class ScheduledTransactionRepository extends BaseRepository {
       WHERE ts.Z_PK = ? AND ts.Z_ENT = ?
     `;
 
-    const row = this.db.prepare(sql).get(scheduleId, Z_ENT.SCHEDULED_TEMPLATE_SELECTOR) as
+    const row = this.db.prepare(sql).get(scheduleId, this.entityTypes.ScheduledTemplateSelector) as
       | {
           id: number;
           templateId: number;
@@ -112,7 +111,7 @@ export class ScheduledTransactionRepository extends BaseRepository {
     `);
 
     const recurringResult = insertRecurring.run(
-      Z_ENT.RECURRING_TRANSACTION,
+      this.entityTypes.RecurringTransaction,
       input.reminderDays ?? 7,
       now,
       startDateCoreData,
@@ -132,7 +131,7 @@ export class ScheduledTransactionRepository extends BaseRepository {
     `;
 
     const result = this.db.prepare(sql).run(
-      Z_ENT.SCHEDULED_TEMPLATE_SELECTOR,
+      this.entityTypes.ScheduledTemplateSelector,
       input.templateId,
       recurringId,
       now,
@@ -178,7 +177,7 @@ export class ScheduledTransactionRepository extends BaseRepository {
       processedUpdates,
       columnMap,
       {
-        additionalWhere: `Z_ENT = ${Z_ENT.SCHEDULED_TEMPLATE_SELECTOR}`,
+        additionalWhere: `Z_ENT = ${this.entityTypes.ScheduledTemplateSelector}`,
       }
     );
 
@@ -193,7 +192,7 @@ export class ScheduledTransactionRepository extends BaseRepository {
       .prepare(
         `SELECT ZPRECURRINGTRANSACTION as recurringId FROM ZTEMPLATESELECTOR WHERE Z_PK = ? AND Z_ENT = ?`
       )
-      .get(scheduleId, Z_ENT.SCHEDULED_TEMPLATE_SELECTOR) as
+      .get(scheduleId, this.entityTypes.ScheduledTemplateSelector) as
       | { recurringId: number | null }
       | undefined;
 

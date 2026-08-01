@@ -1,6 +1,5 @@
 import { BaseRepository } from "./base.js";
 import { Tag } from "../types.js";
-import { Z_ENT } from "../constants.js";
 import { nowAsCoreData } from "../utils/date.js";
 import { generateUUID } from "../utils/uuid.js";
 
@@ -61,9 +60,11 @@ export class TagRepository extends BaseRepository {
 
     const result = this.db
       .prepare(sql)
-      .run(Z_ENT.TAG, now, now, name.trim(), canonicalName, uuid);
+      .run(this.entityTypes.Tag, now, now, name.trim(), canonicalName, uuid);
 
-    return result.lastInsertRowid as number;
+    const newId = result.lastInsertRowid as number;
+    this.updatePrimaryKey("Tag", newId);
+    return newId;
   }
 
   /**
@@ -72,13 +73,13 @@ export class TagRepository extends BaseRepository {
   addToLineItem(lineItemId: number, tagId: number): boolean {
     const existing = this.db
       .prepare(
-        `SELECT 1 FROM Z_19PTAGS WHERE Z_19PLINEITEMS = ? AND Z_47PTAGS = ?`
+        `SELECT 1 FROM Z_19PTAGS WHERE Z_19PLINEITEMS = ? AND ${this.tagJunctionColumn} = ?`
       )
       .get(lineItemId, tagId);
 
     if (existing) return false;
 
-    const sql = `INSERT INTO Z_19PTAGS (Z_19PLINEITEMS, Z_47PTAGS) VALUES (?, ?)`;
+    const sql = `INSERT INTO Z_19PTAGS (Z_19PLINEITEMS, ${this.tagJunctionColumn}) VALUES (?, ?)`;
     this.db.prepare(sql).run(lineItemId, tagId);
     return true;
   }
@@ -87,7 +88,7 @@ export class TagRepository extends BaseRepository {
    * Remove a tag from a line item
    */
   removeFromLineItem(lineItemId: number, tagId: number): boolean {
-    const sql = `DELETE FROM Z_19PTAGS WHERE Z_19PLINEITEMS = ? AND Z_47PTAGS = ?`;
+    const sql = `DELETE FROM Z_19PTAGS WHERE Z_19PLINEITEMS = ? AND ${this.tagJunctionColumn} = ?`;
     const result = this.db.prepare(sql).run(lineItemId, tagId);
     return result.changes > 0;
   }

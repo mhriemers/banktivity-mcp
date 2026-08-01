@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { TagRepository } from "../../src/repositories/tags.js";
-import { createMockDatabase, createMockStatement, asDatabaseInstance } from "../helpers/mock-db.js";
+import { createMockDatabase, createMockStatement, asDatabaseInstance, mockEntityTypes, mockTagJunctionColumn } from "../helpers/mock-db.js";
 
 describe("TagRepository", () => {
   let mockDb: ReturnType<typeof createMockDatabase>;
@@ -8,7 +8,7 @@ describe("TagRepository", () => {
 
   beforeEach(() => {
     mockDb = createMockDatabase();
-    repository = new TagRepository(asDatabaseInstance(mockDb));
+    repository = new TagRepository(asDatabaseInstance(mockDb), mockEntityTypes, mockTagJunctionColumn);
   });
 
   describe("list", () => {

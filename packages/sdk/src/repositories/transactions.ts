@@ -5,7 +5,6 @@ import {
   UpdateTransactionInput,
   TransactionFilter,
 } from "../types.js";
-import { Z_ENT } from "../constants.js";
 import { nowAsCoreData, coreDataToISO, isoToCoreData } from "../utils/date.js";
 import { generateUUID } from "../utils/uuid.js";
 import { DatabaseConnection } from "../connection.js";
@@ -19,7 +18,7 @@ export class TransactionRepository extends BaseRepository {
   private lineItems: LineItemRepository;
 
   constructor(connection: DatabaseConnection, lineItems: LineItemRepository) {
-    super(connection.instance);
+    super(connection.instance, connection.entityTypes, connection.tagJunctionColumn);
     this.connection = connection;
     this.lineItems = lineItems;
   }
@@ -188,7 +187,7 @@ export class TransactionRepository extends BaseRepository {
       `);
 
       const txResult = insertTransaction.run(
-        Z_ENT.TRANSACTION,
+        this.entityTypes.Transaction,
         transactionTypeId,
         currencyId,
         now,
@@ -200,6 +199,7 @@ export class TransactionRepository extends BaseRepository {
       );
 
       result.transactionId = txResult.lastInsertRowid as number;
+      this.updatePrimaryKey("Transaction", result.transactionId);
 
       for (const item of input.lineItems) {
         const lineItemId = this.lineItems.create(

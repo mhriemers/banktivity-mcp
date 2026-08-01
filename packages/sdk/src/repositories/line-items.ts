@@ -1,6 +1,5 @@
 import { BaseRepository } from "./base.js";
 import { LineItem, UpdateLineItemInput } from "../types.js";
-import { Z_ENT } from "../constants.js";
 import { nowAsCoreData } from "../utils/date.js";
 import { generateUUID } from "../utils/uuid.js";
 
@@ -119,27 +118,40 @@ export class LineItemRepository extends BaseRepository {
     const now = nowAsCoreData();
     const uuid = generateUUID();
 
+    // Determine Z1_PACCOUNT from the account's class.
+    // Income/expense categories (ZPACCOUNTCLASS >= 6000) use group 2;
+    // all balance-sheet accounts (bank, credit card, investment, etc.) use group 3.
+    // A NULL result (unknown account) defaults to 3 to avoid a crash on open.
+    const acctRow = this.db
+      .prepare(`SELECT ZPACCOUNTCLASS FROM ZACCOUNT WHERE Z_PK = ?`)
+      .get(accountId) as { ZPACCOUNTCLASS: number } | undefined;
+    const z1PAccount = acctRow && acctRow.ZPACCOUNTCLASS >= 6000 ? 2 : 3;
+
     const sql = `
       INSERT INTO ZLINEITEM (
         Z_ENT, Z_OPT, ZPACCOUNT, ZPTRANSACTION,
         ZPCREATIONTIME, ZPTRANSACTIONAMOUNT, ZPEXCHANGERATE,
-        ZPRUNNINGBALANCE, ZPMEMO, ZPUNIQUEID, ZPCLEARED
-      ) VALUES (?, 0, ?, ?, ?, ?, 1.0, 0, ?, ?, 0)
+        ZPRUNNINGBALANCE, ZPMEMO, ZPUNIQUEID, ZPCLEARED,
+        Z1_PACCOUNT, ZPINTRADAYSORTINDEX
+      ) VALUES (?, 0, ?, ?, ?, ?, 1.0, 0, ?, ?, 0, ?, 0)
     `;
 
     const result = this.db
       .prepare(sql)
       .run(
-        Z_ENT.LINEITEM,
+        this.entityTypes.LineItem,
         accountId,
         transactionId,
         now,
         amount,
         memo ?? null,
-        uuid
+        uuid,
+        z1PAccount
       );
 
-    return result.lastInsertRowid as number;
+    const newId = result.lastInsertRowid as number;
+    this.updatePrimaryKey("LineItem", newId);
+    return newId;
   }
 
   /**

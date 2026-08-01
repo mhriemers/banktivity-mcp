@@ -1,6 +1,9 @@
 // Main client
 export { BanktivityClient, BanktivityClientOptions } from "./client.js";
 
+// Connection and entity types
+export { DatabaseConnection, EntityTypes } from "./connection.js";
+
 // Types
 export * from "./types.js";
 
