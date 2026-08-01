@@ -7,6 +7,7 @@ const mockStatement = {
 };
 const mockDbInstance = {
   prepare: vi.fn().mockReturnValue(mockStatement),
+  pragma: vi.fn(),
   close: vi.fn(),
 };
 
@@ -30,6 +31,7 @@ describe("DatabaseConnection", () => {
     constructorCalls = [];
     mockStatement.get.mockReset();
     mockDbInstance.close.mockReset();
+    mockDbInstance.pragma.mockReset();
     connection = new DatabaseConnection("/path/to/file.bank8");
   });
 
@@ -58,9 +60,20 @@ describe("DatabaseConnection", () => {
   });
 
   describe("close", () => {
-    it("should close the database connection", () => {
+    it("should checkpoint the WAL and close the database connection", () => {
       connection.close();
+      expect(mockDbInstance.pragma).toHaveBeenCalledWith('wal_checkpoint(TRUNCATE)');
       expect(mockDbInstance.close).toHaveBeenCalled();
+    });
+
+    it("should checkpoint before closing", () => {
+      const order: string[] = [];
+      mockDbInstance.pragma.mockImplementation(() => order.push("pragma"));
+      mockDbInstance.close.mockImplementation(() => order.push("close"));
+
+      connection.close();
+
+      expect(order).toEqual(["pragma", "close"]);
     });
   });
 

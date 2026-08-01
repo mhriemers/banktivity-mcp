@@ -20,9 +20,15 @@ export class DatabaseConnection {
   }
 
   /**
-   * Close the database connection
+   * Close the database connection.
+   *
+   * Runs a WAL checkpoint first so that all writes are merged into the main
+   * database file and the -wal sidecar is truncated. Without this, Banktivity
+   * may not see the changes (or may refuse to open the file) if it reads the
+   * database before the WAL is replayed.
    */
   close(): void {
+    this.db.pragma('wal_checkpoint(TRUNCATE)');
     this.db.close();
   }
 

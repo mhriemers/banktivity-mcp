@@ -63,7 +63,9 @@ export class TagRepository extends BaseRepository {
       .prepare(sql)
       .run(Z_ENT.TAG, now, now, name.trim(), canonicalName, uuid);
 
-    return result.lastInsertRowid as number;
+    const newId = result.lastInsertRowid as number;
+    this.updatePrimaryKey("Tag", newId);
+    return newId;
   }
 
   /**

@@ -90,6 +90,30 @@ export abstract class BaseRepository {
   }
 
   /**
+   * Update the Core Data Z_PRIMARYKEY counter after an INSERT.
+   *
+   * Core Data uses this table to validate the database and allocate new IDs on
+   * open. If it is not updated, Banktivity may crash or refuse to open the file.
+   *
+   * Entity name → Z_PRIMARYKEY.Z_NAME mappings:
+   *   ZLINEITEM              → 'LineItem'
+   *   ZTRANSACTION           → 'Transaction'
+   *   ZACCOUNT               → 'Account'
+   *   ZTAG                   → 'Tag'
+   *   ZTRANSACTIONTEMPLATE   → 'TransactionTemplate'
+   *
+   * Using MAX(Z_MAX, ?) ensures we never move the counter backwards if another
+   * process has already advanced it further.
+   */
+  protected updatePrimaryKey(entityName: string, newId: number): void {
+    this.db
+      .prepare(
+        `UPDATE Z_PRIMARYKEY SET Z_MAX = MAX(Z_MAX, ?) WHERE Z_NAME = ?`
+      )
+      .run(newId, entityName);
+  }
+
+  /**
    * Wrap multiple operations in a transaction
    */
   protected runTransaction<T>(fn: () => T): T {

@@ -172,7 +172,9 @@ export class AccountRepository extends BaseRepository {
       uuid
     );
 
-    return result.lastInsertRowid as number;
+    const newId = result.lastInsertRowid as number;
+    this.updatePrimaryKey("Account", newId);
+    return newId;
   }
 
   /**

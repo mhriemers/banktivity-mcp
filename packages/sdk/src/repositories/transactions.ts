@@ -200,6 +200,7 @@ export class TransactionRepository extends BaseRepository {
       );
 
       result.transactionId = txResult.lastInsertRowid as number;
+      this.updatePrimaryKey("Transaction", result.transactionId);
 
       for (const item of input.lineItems) {
         const lineItemId = this.lineItems.create(

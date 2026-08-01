@@ -111,6 +111,7 @@ export class TransactionTemplateRepository extends BaseRepository {
       );
 
       templateId = result.lastInsertRowid as number;
+      this.updatePrimaryKey("TransactionTemplate", templateId);
 
       if (input.lineItems && input.lineItems.length > 0) {
         const insertLineItem = this.db.prepare(`
