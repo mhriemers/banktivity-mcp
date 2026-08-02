@@ -30,6 +30,7 @@ export interface LineItem {
   amount: number;
   memo: string | null;
   runningBalance: number | null;
+  cleared: boolean;
 }
 
 export interface CategorySpending {
@@ -120,6 +121,7 @@ export interface UpdateLineItemInput {
   accountId?: number;
   amount?: number;
   memo?: string;
+  cleared?: boolean;
 }
 
 export interface CreateAccountInput {

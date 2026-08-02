@@ -39,7 +39,7 @@ export function registerLineItemTools(
     "update_line_item",
     {
       title: "Update Line Item",
-      description: "Update a line item's account, amount, or memo",
+      description: "Update a line item's account, amount, memo, or cleared status",
       inputSchema: {
         line_item_id: z.number().describe("The line item ID to update"),
         account_id: z.number().optional().describe("New account ID"),
@@ -49,10 +49,11 @@ export function registerLineItemTools(
           .describe("New account name (alternative to account_id)"),
         amount: z.number().optional().describe("New amount"),
         memo: z.string().optional().describe("New memo"),
+        cleared: z.boolean().optional().describe("Set cleared/reconciled status"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
-    async ({ line_item_id, account_id, account_name, amount, memo }) => {
+    async ({ line_item_id, account_id, account_name, amount, memo, cleared }) => {
       let accountId = account_id;
       if (!accountId && account_name) {
         const resolved = resolveAccountIdOrError(client, undefined, account_name);
@@ -60,10 +61,11 @@ export function registerLineItemTools(
         accountId = resolved;
       }
 
-      const updates: { accountId?: number; amount?: number; memo?: string } = {};
+      const updates: { accountId?: number; amount?: number; memo?: string; cleared?: boolean } = {};
       if (accountId !== undefined) updates.accountId = accountId;
       if (amount !== undefined) updates.amount = amount;
       if (memo !== undefined) updates.memo = memo;
+      if (cleared !== undefined) updates.cleared = cleared;
 
       const affectedAccounts = client.lineItems.update(line_item_id, updates);
 

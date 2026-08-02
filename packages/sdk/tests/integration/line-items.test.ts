@@ -243,4 +243,87 @@ describe("Line Item Integration Tests", () => {
       expect(accountIds).toContain(testData.accounts.groceries);
     });
   });
+
+  describe("line item cleared status", () => {
+    it("should expose cleared field on line items (defaults to false)", () => {
+      const { transactionId } = transactionRepo.create({
+        title: "Test Cleared",
+        date: "2024-01-15",
+        lineItems: [
+          { accountId: testData.accounts.checking, amount: -50.00 },
+        ],
+      });
+
+      const lineItems = lineItemRepo.getForTransaction(transactionId);
+
+      expect(lineItems).toHaveLength(1);
+      expect(lineItems[0]).toHaveProperty("cleared");
+      expect(lineItems[0].cleared).toBe(false);
+    });
+
+    it("should expose cleared field on get()", () => {
+      const { lineItemIds } = transactionRepo.create({
+        title: "Test Cleared Get",
+        date: "2024-01-15",
+        lineItems: [
+          { accountId: testData.accounts.checking, amount: -25.00 },
+        ],
+      });
+
+      const lineItem = lineItemRepo.get(lineItemIds[0]);
+
+      expect(lineItem).not.toBeNull();
+      expect(lineItem!.cleared).toBe(false);
+    });
+
+    it("should update cleared status via update()", () => {
+      const { lineItemIds } = transactionRepo.create({
+        title: "Test Cleared Update",
+        date: "2024-01-15",
+        lineItems: [
+          { accountId: testData.accounts.checking, amount: -30.00 },
+        ],
+      });
+
+      lineItemRepo.update(lineItemIds[0], { cleared: true });
+
+      const updated = lineItemRepo.get(lineItemIds[0]);
+      expect(updated!.cleared).toBe(true);
+    });
+
+    it("should clear individual line items independently", () => {
+      const { lineItemIds } = transactionRepo.create({
+        title: "Test Independent Cleared",
+        date: "2024-01-15",
+        lineItems: [
+          { accountId: testData.accounts.checking, amount: -100.00 },
+          { accountId: testData.accounts.savings, amount: 100.00 },
+        ],
+      });
+
+      lineItemRepo.update(lineItemIds[0], { cleared: true });
+
+      const first = lineItemRepo.get(lineItemIds[0]);
+      const second = lineItemRepo.get(lineItemIds[1]);
+
+      expect(first!.cleared).toBe(true);
+      expect(second!.cleared).toBe(false);
+    });
+
+    it("should unmark cleared status", () => {
+      const { lineItemIds } = transactionRepo.create({
+        title: "Test Unmark Cleared",
+        date: "2024-01-15",
+        lineItems: [
+          { accountId: testData.accounts.checking, amount: -40.00 },
+        ],
+      });
+
+      lineItemRepo.update(lineItemIds[0], { cleared: true });
+      expect(lineItemRepo.get(lineItemIds[0])!.cleared).toBe(true);
+
+      lineItemRepo.update(lineItemIds[0], { cleared: false });
+      expect(lineItemRepo.get(lineItemIds[0])!.cleared).toBe(false);
+    });
+  });
 });

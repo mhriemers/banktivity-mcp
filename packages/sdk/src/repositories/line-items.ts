@@ -19,7 +19,8 @@ export class LineItemRepository extends BaseRepository {
         a.ZPNAME as accountName,
         li.ZPTRANSACTIONAMOUNT as amount,
         li.ZPMEMO as memo,
-        li.ZPRUNNINGBALANCE as runningBalance
+        li.ZPRUNNINGBALANCE as runningBalance,
+        li.ZPCLEARED as cleared
       FROM ZLINEITEM li
       JOIN ZACCOUNT a ON li.ZPACCOUNT = a.Z_PK
       WHERE li.ZPTRANSACTION = ?
@@ -33,6 +34,7 @@ export class LineItemRepository extends BaseRepository {
       amount: number;
       memo: string | null;
       runningBalance: number | null;
+      cleared: number;
     }>;
 
     return rows.map((row) => ({
@@ -42,6 +44,7 @@ export class LineItemRepository extends BaseRepository {
       amount: row.amount,
       memo: row.memo,
       runningBalance: row.runningBalance,
+      cleared: row.cleared === 1,
     }));
   }
 
@@ -56,7 +59,8 @@ export class LineItemRepository extends BaseRepository {
         a.ZPNAME as accountName,
         li.ZPTRANSACTIONAMOUNT as amount,
         li.ZPMEMO as memo,
-        li.ZPRUNNINGBALANCE as runningBalance
+        li.ZPRUNNINGBALANCE as runningBalance,
+        li.ZPCLEARED as cleared
       FROM ZLINEITEM li
       JOIN ZACCOUNT a ON li.ZPACCOUNT = a.Z_PK
       WHERE li.Z_PK = ?
@@ -70,6 +74,7 @@ export class LineItemRepository extends BaseRepository {
           amount: number;
           memo: string | null;
           runningBalance: number | null;
+          cleared: number;
         }
       | undefined;
 
@@ -82,6 +87,7 @@ export class LineItemRepository extends BaseRepository {
       amount: row.amount,
       memo: row.memo,
       runningBalance: row.runningBalance,
+      cleared: row.cleared === 1,
     };
   }
 
@@ -156,9 +162,16 @@ export class LineItemRepository extends BaseRepository {
       accountId: "ZPACCOUNT",
       amount: "ZPTRANSACTIONAMOUNT",
       memo: "ZPMEMO",
+      cleared: "ZPCLEARED",
     };
 
-    const changes = this.executeUpdate("ZLINEITEM", lineItemId, updates, columnMap, {
+    const processedUpdates: Record<string, unknown> = { ...updates };
+
+    if (updates.cleared !== undefined) {
+      processedUpdates.cleared = updates.cleared ? 1 : 0;
+    }
+
+    const changes = this.executeUpdate("ZLINEITEM", lineItemId, processedUpdates, columnMap, {
       addModificationDate: false,
       incrementOpt: false,
     });
