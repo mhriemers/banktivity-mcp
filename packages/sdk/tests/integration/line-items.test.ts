@@ -127,10 +127,53 @@ describe("Line Item Integration Tests", () => {
       expect(updated!.accountName).toBe("Savings");
     });
 
+    it("updates Z1_PACCOUNT when moving a line item to a category", () => {
+      const { lineItemIds } = transactionRepo.create({
+        title: "Categorize transaction",
+        date: "2024-01-15",
+        lineItems: [
+          { accountId: testData.accounts.checking, amount: -50.00 },
+        ],
+      });
+
+      lineItemRepo.update(lineItemIds[0], {
+        accountId: testData.accounts.groceries,
+      });
+
+      const row = db
+        .prepare(`SELECT ZPACCOUNT, Z1_PACCOUNT FROM ZLINEITEM WHERE Z_PK = ?`)
+        .get(lineItemIds[0]) as { ZPACCOUNT: number; Z1_PACCOUNT: number };
+
+      expect(row.ZPACCOUNT).toBe(testData.accounts.groceries);
+      expect(row.Z1_PACCOUNT).toBe(2);
+    });
+
+    it("updates Z1_PACCOUNT when moving a line item to a balance-sheet account", () => {
+      const { lineItemIds } = transactionRepo.create({
+        title: "Uncategorize transaction",
+        date: "2024-01-15",
+        lineItems: [
+          { accountId: testData.accounts.groceries, amount: -50.00 },
+        ],
+      });
+
+      lineItemRepo.update(lineItemIds[0], {
+        accountId: testData.accounts.checking,
+      });
+
+      const row = db
+        .prepare(`SELECT ZPACCOUNT, Z1_PACCOUNT FROM ZLINEITEM WHERE Z_PK = ?`)
+        .get(lineItemIds[0]) as { ZPACCOUNT: number; Z1_PACCOUNT: number };
+
+      expect(row.ZPACCOUNT).toBe(testData.accounts.checking);
+      expect(row.Z1_PACCOUNT).toBe(3);
+    });
+
     it("should return null for non-existent line item", () => {
       const result = lineItemRepo.update(999, { amount: 100 });
       expect(result).toBeNull();
     });
+
   });
 
   describe("delete line item", () => {

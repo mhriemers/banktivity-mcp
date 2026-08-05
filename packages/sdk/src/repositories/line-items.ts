@@ -156,9 +156,20 @@ export class LineItemRepository extends BaseRepository {
       accountId: "ZPACCOUNT",
       amount: "ZPTRANSACTIONAMOUNT",
       memo: "ZPMEMO",
+      z1PAccount: "Z1_PACCOUNT",
     };
 
-    const changes = this.executeUpdate("ZLINEITEM", lineItemId, updates, columnMap, {
+    const processedUpdates: Record<string, unknown> = { ...updates };
+
+    if (updates.accountId !== undefined) {
+      const accountRow = this.db
+        .prepare(`SELECT ZPACCOUNTCLASS FROM ZACCOUNT WHERE Z_PK = ?`)
+        .get(updates.accountId) as { ZPACCOUNTCLASS: number } | undefined;
+      processedUpdates.z1PAccount =
+        accountRow && accountRow.ZPACCOUNTCLASS >= 6000 ? 2 : 3;
+    }
+
+    const changes = this.executeUpdate("ZLINEITEM", lineItemId, processedUpdates, columnMap, {
       addModificationDate: false,
       incrementOpt: false,
     });
