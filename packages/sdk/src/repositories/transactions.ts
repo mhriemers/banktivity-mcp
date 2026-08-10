@@ -175,6 +175,19 @@ export class TransactionRepository extends BaseRepository {
       ? this.connection.getTransactionTypeId(input.transactionType)
       : null;
 
+    const accountCurrencyIds = input.lineItems.map((item) => {
+      const row = this.db
+        .prepare(`SELECT ZCURRENCY as currencyId FROM ZACCOUNT WHERE Z_PK = ?`)
+        .get(item.accountId) as { currencyId: number | null } | undefined;
+      return row?.currencyId ?? null;
+    });
+    const transactionCurrencyAmount =
+      currencyId === null
+        ? undefined
+        : input.lineItems.find(
+            (_, index) => accountCurrencyIds[index] === currencyId
+          )?.amount;
+
     const result = { transactionId: 0, lineItemIds: [] as number[] };
     const affectedAccounts = new Set<number>();
 
@@ -201,12 +214,29 @@ export class TransactionRepository extends BaseRepository {
 
       result.transactionId = txResult.lastInsertRowid as number;
 
-      for (const item of input.lineItems) {
+      for (const [index, item] of input.lineItems.entries()) {
+        const accountCurrencyId = accountCurrencyIds[index];
+        let transactionAmount = item.amount;
+        let exchangeRate = 1.0;
+
+        if (
+          transactionCurrencyAmount !== undefined &&
+          transactionCurrencyAmount !== 0 &&
+          accountCurrencyId !== null &&
+          accountCurrencyId !== currencyId &&
+          item.amount !== 0
+        ) {
+          transactionAmount =
+            Math.sign(item.amount) * Math.abs(transactionCurrencyAmount);
+          exchangeRate = Math.abs(item.amount / transactionAmount);
+        }
+
         const lineItemId = this.lineItems.create(
           result.transactionId,
           item.accountId,
-          item.amount,
-          item.memo
+          transactionAmount,
+          item.memo,
+          exchangeRate
         );
         result.lineItemIds.push(lineItemId);
         affectedAccounts.add(item.accountId);

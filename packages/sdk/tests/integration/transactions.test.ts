@@ -26,6 +26,64 @@ describe("Transaction Integration Tests", () => {
   });
 
   describe("create transaction with line items", () => {
+    it("should preserve exchange metadata for a cross-currency transfer", () => {
+      const usdCurrencyId = db.prepare(
+        `INSERT INTO ZCURRENCY (Z_ENT, Z_OPT, ZPCODE, ZPNAME) VALUES (4, 0, 'USD', 'US Dollar')`
+      ).run().lastInsertRowid as number;
+      const now = Date.now();
+      const usdAccountId = db.prepare(`
+        INSERT INTO ZACCOUNT (
+          Z_ENT, Z_OPT, ZCURRENCY, ZPACCOUNTCLASS,
+          ZPNAME, ZPFULLNAME, ZPCREATIONTIME, ZPMODIFICATIONDATE, ZPUNIQUEID
+        ) VALUES (3, 0, ?, 1006, 'USD Checking', 'USD Checking', ?, ?, 'usd-checking')
+      `).run(usdCurrencyId, now, now).lastInsertRowid as number;
+      const baseConnection = createMockConnection(db);
+      const connection = {
+        ...baseConnection,
+        getDefaultCurrencyId: () => usdCurrencyId,
+      };
+      lineItemRepo = new LineItemRepository(
+        db,
+        connection.entityTypes,
+        connection.tagJunctionColumn
+      );
+      transactionRepo = new TransactionRepository(connection as any, lineItemRepo);
+
+      const result = transactionRepo.create({
+        title: "Transfer USD to EUR",
+        date: "2024-01-15",
+        lineItems: [
+          { accountId: usdAccountId, amount: -200 },
+          { accountId: testData.accounts.checking, amount: 166.6666666667 },
+        ],
+      });
+
+      const transaction = db.prepare(
+        `SELECT ZPCURRENCY FROM ZTRANSACTION WHERE Z_PK = ?`
+      ).get(result.transactionId) as { ZPCURRENCY: number };
+      const lines = db.prepare(`
+        SELECT ZPACCOUNT, ZPTRANSACTIONAMOUNT, ZPEXCHANGERATE
+        FROM ZLINEITEM WHERE ZPTRANSACTION = ? ORDER BY Z_PK
+      `).all(result.transactionId) as Array<{
+        ZPACCOUNT: number;
+        ZPTRANSACTIONAMOUNT: number;
+        ZPEXCHANGERATE: number;
+      }>;
+
+      expect(transaction.ZPCURRENCY).toBe(usdCurrencyId);
+      expect(lines[0]).toMatchObject({
+        ZPACCOUNT: usdAccountId,
+        ZPTRANSACTIONAMOUNT: -200,
+        ZPEXCHANGERATE: 1,
+      });
+      expect(lines[1].ZPACCOUNT).toBe(testData.accounts.checking);
+      expect(lines[1].ZPTRANSACTIONAMOUNT).toBeCloseTo(200, 8);
+      expect(lines[1].ZPEXCHANGERATE).toBeCloseTo(0.8333333333, 8);
+      expect(
+        lines[1].ZPTRANSACTIONAMOUNT * lines[1].ZPEXCHANGERATE
+      ).toBeCloseTo(166.6666666667, 8);
+    });
+
     it("should create a transaction with multiple line items", () => {
       const result = transactionRepo.create({
         title: "Grocery Shopping",

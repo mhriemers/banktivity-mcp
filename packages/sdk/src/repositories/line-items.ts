@@ -114,7 +114,8 @@ export class LineItemRepository extends BaseRepository {
     transactionId: number,
     accountId: number,
     amount: number,
-    memo?: string
+    memo?: string,
+    exchangeRate = 1.0
   ): number {
     const now = nowAsCoreData();
     const uuid = generateUUID();
@@ -124,7 +125,7 @@ export class LineItemRepository extends BaseRepository {
         Z_ENT, Z_OPT, ZPACCOUNT, ZPTRANSACTION,
         ZPCREATIONTIME, ZPTRANSACTIONAMOUNT, ZPEXCHANGERATE,
         ZPRUNNINGBALANCE, ZPMEMO, ZPUNIQUEID, ZPCLEARED
-      ) VALUES (?, 0, ?, ?, ?, ?, 1.0, 0, ?, ?, 0)
+      ) VALUES (?, 0, ?, ?, ?, ?, ?, 0, ?, ?, 0)
     `;
 
     const result = this.db
@@ -135,6 +136,7 @@ export class LineItemRepository extends BaseRepository {
         transactionId,
         now,
         amount,
+        exchangeRate,
         memo ?? null,
         uuid
       );
