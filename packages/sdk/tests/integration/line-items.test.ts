@@ -3,6 +3,7 @@ import Database from "better-sqlite3";
 import { createTestDatabase, seedTestDatabase, createMockConnection, type TestData } from "./test-db.js";
 import { TransactionRepository } from "../../src/repositories/transactions.js";
 import { LineItemRepository } from "../../src/repositories/line-items.js";
+import { nowAsCoreData } from "../../src/utils/date.js";
 
 describe("Line Item Integration Tests", () => {
   let db: Database.Database;
@@ -68,6 +69,46 @@ describe("Line Item Integration Tests", () => {
     it("should return empty array for non-existent transaction", () => {
       const lineItems = lineItemRepo.getForTransaction(999);
       expect(lineItems).toEqual([]);
+    });
+  });
+
+  describe("multi-currency amount mapping", () => {
+    it("should return native amounts from get and getForTransaction", () => {
+      const usdCurrencyId = db.prepare(
+        `INSERT INTO ZCURRENCY (Z_ENT, Z_OPT, ZPCODE, ZPNAME) VALUES (4, 0, 'USD', 'US Dollar')`
+      ).run().lastInsertRowid as number;
+      const now = nowAsCoreData();
+      const usdAccountId = db.prepare(`
+        INSERT INTO ZACCOUNT (
+          Z_ENT, Z_OPT, ZCURRENCY, ZPACCOUNTCLASS,
+          ZPNAME, ZPFULLNAME, ZPCREATIONTIME, ZPMODIFICATIONDATE, ZPUNIQUEID
+        ) VALUES (3, 0, ?, 1006, 'USD Checking', 'USD Checking', ?, ?, 'usd-checking')
+      `).run(usdCurrencyId, now, now).lastInsertRowid as number;
+      const transactionId = db.prepare(`
+        INSERT INTO ZTRANSACTION (
+          Z_ENT, Z_OPT, ZPCURRENCY, ZPCREATIONTIME, ZPDATE,
+          ZPMODIFICATIONDATE, ZPTITLE, ZPUNIQUEID
+        ) VALUES (53, 0, ?, ?, ?, ?, 'Cross-currency transfer', 'cross-currency')
+      `).run(usdCurrencyId, now, now, now).lastInsertRowid as number;
+      const lineItemId = db.prepare(`
+        INSERT INTO ZLINEITEM (
+          Z_ENT, Z_OPT, ZPACCOUNT, ZPTRANSACTION, ZPCREATIONTIME,
+          ZPTRANSACTIONAMOUNT, ZPEXCHANGERATE, ZPRUNNINGBALANCE, ZPUNIQUEID
+        ) VALUES (19, 0, ?, ?, ?, 100, 0.8333333333, 83.33333333, 'cross-currency-line')
+      `).run(testData.accounts.checking, transactionId, now).lastInsertRowid as number;
+      db.prepare(`
+        INSERT INTO ZLINEITEM (
+          Z_ENT, Z_OPT, ZPACCOUNT, ZPTRANSACTION, ZPCREATIONTIME,
+          ZPTRANSACTIONAMOUNT, ZPEXCHANGERATE, ZPRUNNINGBALANCE, ZPUNIQUEID
+        ) VALUES (19, 0, ?, ?, ?, -100, 1, -100, 'cross-currency-offset')
+      `).run(usdAccountId, transactionId, now);
+
+      const lineItem = lineItemRepo.get(lineItemId);
+      const transactionLineItems = lineItemRepo.getForTransaction(transactionId);
+
+      expect(lineItem!.amount).toBeCloseTo(83.33333333, 6);
+      expect(transactionLineItems[0].amount).toBeCloseTo(83.33333333, 6);
+      expect(transactionLineItems[1].amount).toBe(-100);
     });
   });
 

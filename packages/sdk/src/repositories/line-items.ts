@@ -17,7 +17,7 @@ export class LineItemRepository extends BaseRepository {
         li.Z_PK as id,
         li.ZPACCOUNT as accountId,
         a.ZPNAME as accountName,
-        li.ZPTRANSACTIONAMOUNT as amount,
+        li.ZPTRANSACTIONAMOUNT * li.ZPEXCHANGERATE as amount,
         li.ZPMEMO as memo,
         li.ZPRUNNINGBALANCE as runningBalance
       FROM ZLINEITEM li
@@ -54,7 +54,7 @@ export class LineItemRepository extends BaseRepository {
         li.Z_PK as id,
         li.ZPACCOUNT as accountId,
         a.ZPNAME as accountName,
-        li.ZPTRANSACTIONAMOUNT as amount,
+        li.ZPTRANSACTIONAMOUNT * li.ZPEXCHANGERATE as amount,
         li.ZPMEMO as memo,
         li.ZPRUNNINGBALANCE as runningBalance
       FROM ZLINEITEM li
@@ -220,7 +220,7 @@ export class LineItemRepository extends BaseRepository {
    */
   recalculateRunningBalances(accountId: number): void {
     const sql = `
-      SELECT li.Z_PK as id, li.ZPTRANSACTIONAMOUNT as amount, t.ZPDATE as date
+      SELECT li.Z_PK as id, li.ZPTRANSACTIONAMOUNT * li.ZPEXCHANGERATE as amount, t.ZPDATE as date
       FROM ZLINEITEM li
       JOIN ZTRANSACTION t ON li.ZPTRANSACTION = t.Z_PK
       WHERE li.ZPACCOUNT = ?
