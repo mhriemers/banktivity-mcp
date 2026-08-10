@@ -122,7 +122,7 @@ export class AccountRepository extends BaseRepository {
    */
   getBalance(accountId: number): number {
     const sql = `
-      SELECT COALESCE(SUM(ZPTRANSACTIONAMOUNT), 0) as balance
+      SELECT COALESCE(SUM(ZPTRANSACTIONAMOUNT * ZPEXCHANGERATE), 0) as balance
       FROM ZLINEITEM
       WHERE ZPACCOUNT = ?
     `;
@@ -200,7 +200,7 @@ export class AccountRepository extends BaseRepository {
     const sql = `
       SELECT
         a.ZPNAME as category,
-        SUM(li.ZPTRANSACTIONAMOUNT) as total,
+        SUM(li.ZPTRANSACTIONAMOUNT * li.ZPEXCHANGERATE) as total,
         COUNT(DISTINCT t.Z_PK) as transactionCount
       FROM ZLINEITEM li
       JOIN ZACCOUNT a ON li.ZPACCOUNT = a.Z_PK
@@ -218,14 +218,14 @@ export class AccountRepository extends BaseRepository {
    */
   getNetWorth(): NetWorth {
     const assetsSql = `
-      SELECT COALESCE(SUM(li.ZPTRANSACTIONAMOUNT), 0) as total
+      SELECT COALESCE(SUM(li.ZPTRANSACTIONAMOUNT * li.ZPEXCHANGERATE), 0) as total
       FROM ZLINEITEM li
       JOIN ZACCOUNT a ON li.ZPACCOUNT = a.Z_PK
       WHERE a.ZPACCOUNTCLASS IN (${ACCOUNT_CLASS.SAVINGS}, ${ACCOUNT_CLASS.CHECKING})
     `;
 
     const liabilitiesSql = `
-      SELECT COALESCE(SUM(li.ZPTRANSACTIONAMOUNT), 0) as total
+      SELECT COALESCE(SUM(li.ZPTRANSACTIONAMOUNT * li.ZPEXCHANGERATE), 0) as total
       FROM ZLINEITEM li
       JOIN ZACCOUNT a ON li.ZPACCOUNT = a.Z_PK
       WHERE a.ZPACCOUNTCLASS = ${ACCOUNT_CLASS.CREDIT_CARD}
