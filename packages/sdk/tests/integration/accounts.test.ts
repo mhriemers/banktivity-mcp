@@ -298,6 +298,27 @@ describe("Account Integration Tests", () => {
       expect(netWorth.netWorth).toBe(0);
     });
 
+    it("should include account class 1001 assets", () => {
+      const legacyCheckingId = accountRepo.create({
+        name: "Legacy Checking",
+        accountClass: 1001,
+      });
+
+      transactionRepo.create({
+        title: "Legacy Deposit",
+        date: "2024-01-01",
+        lineItems: [
+          { accountId: legacyCheckingId, amount: 83.33 },
+          { accountId: testData.accounts.salary, amount: -83.33 },
+        ],
+      });
+
+      const netWorth = accountRepo.getNetWorth();
+
+      expect(netWorth.assets).toBeCloseTo(83.33, 2);
+      expect(netWorth.netWorth).toBeCloseTo(83.33, 2);
+    });
+
     it("should calculate assets from checking and savings", () => {
       transactionRepo.create({
         title: "Deposit",

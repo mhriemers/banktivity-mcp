@@ -23,6 +23,7 @@ export const Z_ENT = {
  * Account class constants
  */
 export const ACCOUNT_CLASS = {
+  LEGACY_CHECKING: 1001,
   SAVINGS: 1002,
   CHECKING: 1006,
   CREDIT_CARD: 5001,
