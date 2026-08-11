@@ -65,20 +65,13 @@ describe("DatabaseConnection", () => {
   });
 
   describe("getDefaultCurrencyId", () => {
-    it("should return currency id when found", () => {
+    it("should throw when StoreAttributes.plist is unavailable", () => {
       mockStatement.get.mockReturnValue({ id: 1 });
 
-      const result = connection.getDefaultCurrencyId();
-
-      expect(result).toBe(1);
-    });
-
-    it("should return null when no currency found", () => {
-      mockStatement.get.mockReturnValue(undefined);
-
-      const result = connection.getDefaultCurrencyId();
-
-      expect(result).toBeNull();
+      expect(() => connection.getDefaultCurrencyId()).toThrow(
+        "Unable to read StoreAttributes.plist"
+      );
+      expect(mockStatement.get).not.toHaveBeenCalled();
     });
   });
 

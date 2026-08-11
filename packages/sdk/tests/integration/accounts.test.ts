@@ -224,6 +224,35 @@ describe("Account Integration Tests", () => {
       const account = accountRepo.get(id);
       expect(account!.accountType).toBe("Expense");
     });
+
+    it("should fail before inserting when the default currency is unavailable", () => {
+      const initialCount = (
+        db.prepare("SELECT COUNT(*) as count FROM ZACCOUNT").get() as {
+          count: number;
+        }
+      ).count;
+      const failingConnection = {
+        ...createMockConnection(db),
+        getDefaultCurrencyId: () => {
+          throw new Error("default currency unavailable");
+        },
+      };
+      const failingRepo = new AccountRepository(failingConnection as any);
+
+      expect(() =>
+        failingRepo.create({
+          name: "Should Not Be Inserted",
+          accountClass: ACCOUNT_CLASS.CHECKING,
+        })
+      ).toThrow("default currency unavailable");
+
+      const finalCount = (
+        db.prepare("SELECT COUNT(*) as count FROM ZACCOUNT").get() as {
+          count: number;
+        }
+      ).count;
+      expect(finalCount).toBe(initialCount);
+    });
   });
 
   describe("category analysis", () => {
