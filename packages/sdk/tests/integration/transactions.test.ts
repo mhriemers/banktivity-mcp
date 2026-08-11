@@ -4,6 +4,9 @@ import { createTestDatabase, seedTestDatabase, createMockConnection, type TestDa
 import { TransactionRepository } from "../../src/repositories/transactions.js";
 import { LineItemRepository } from "../../src/repositories/line-items.js";
 import { TagRepository } from "../../src/repositories/tags.js";
+import { Z_ENT, ACCOUNT_CLASS } from "../../src/constants.js";
+import { nowAsCoreData } from "../../src/utils/date.js";
+import { generateUUID } from "../../src/utils/uuid.js";
 
 describe("Transaction Integration Tests", () => {
   let db: Database.Database;
@@ -439,5 +442,58 @@ describe("Transaction Integration Tests", () => {
       const untagged = tagRepo.untagTransaction(transactionId, tagId);
       expect(untagged).toBe(2);
     });
+  });
+});
+
+
+describe("transaction currency", () => {
+  it("uses the shared non-default account currency", () => {
+    const testDb = createTestDatabase();
+    seedTestDatabase(testDb);
+    const connection = createMockConnection(testDb);
+    const testLineItemRepo = new LineItemRepository(testDb);
+    const testTransactionRepo = new TransactionRepository(connection as any, testLineItemRepo);
+
+    const currencyResult = testDb.prepare(`
+      INSERT INTO ZCURRENCY (Z_ENT, Z_OPT, ZPCODE, ZPNAME)
+      VALUES (4, 0, 'GEL', 'Georgian Lari')
+    `).run();
+    const gelCurrencyId = currencyResult.lastInsertRowid as number;
+    const now = nowAsCoreData();
+
+    const accountIds = ["GEL Checking", "GEL Savings"].map((name) => {
+      const result = testDb.prepare(`
+        INSERT INTO ZACCOUNT (
+          Z_ENT, Z_OPT, ZCURRENCY, ZPACCOUNTCLASS,
+          ZPNAME, ZPFULLNAME, ZPCREATIONTIME, ZPMODIFICATIONDATE, ZPUNIQUEID
+        ) VALUES (?, 0, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        Z_ENT.ACCOUNT,
+        gelCurrencyId,
+        ACCOUNT_CLASS.CHECKING,
+        name,
+        name,
+        now,
+        now,
+        generateUUID()
+      );
+      return result.lastInsertRowid as number;
+    });
+
+    const { transactionId } = testTransactionRepo.create({
+      title: "GEL transfer",
+      date: "2024-01-15",
+      lineItems: accountIds.map((accountId, index) => ({
+        accountId,
+        amount: index === 0 ? 100 : -100,
+      })),
+    });
+
+    const row = testDb
+      .prepare("SELECT ZPCURRENCY as currencyId FROM ZTRANSACTION WHERE Z_PK = ?")
+      .get(transactionId) as { currencyId: number };
+
+    expect(row.currencyId).toBe(gelCurrencyId);
+    testDb.close();
   });
 });

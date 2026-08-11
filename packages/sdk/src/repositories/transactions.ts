@@ -170,7 +170,9 @@ export class TransactionRepository extends BaseRepository {
     const now = nowAsCoreData();
     const transactionDate = isoToCoreData(input.date);
     const transactionUUID = generateUUID();
-    const currencyId = this.connection.getDefaultCurrencyId();
+    const currencyId = this.getTransactionCurrencyId(
+      input.lineItems.map((item) => item.accountId)
+    );
     const transactionTypeId = input.transactionType
       ? this.connection.getTransactionTypeId(input.transactionType)
       : null;
@@ -218,6 +220,30 @@ export class TransactionRepository extends BaseRepository {
     }
 
     return result;
+  }
+
+  private getTransactionCurrencyId(accountIds: number[]): number | null {
+    const defaultCurrencyId = this.connection.getDefaultCurrencyId();
+    const uniqueAccountIds = [...new Set(accountIds)];
+
+    if (uniqueAccountIds.length === 0) return defaultCurrencyId;
+
+    const placeholders = uniqueAccountIds.map(() => "?").join(", ");
+    const rows = this.db
+      .prepare(
+        `SELECT ZCURRENCY as currencyId FROM ZACCOUNT WHERE Z_PK IN (${placeholders})`
+      )
+      .all(...uniqueAccountIds) as Array<{ currencyId: number | null }>;
+    const currencyIds = rows
+      .map((row) => row.currencyId)
+      .filter((currencyId): currencyId is number => currencyId !== null);
+
+    if (currencyIds.length !== uniqueAccountIds.length) return defaultCurrencyId;
+
+    const uniqueCurrencyIds = [...new Set(currencyIds)];
+    if (uniqueCurrencyIds.length === 1) return uniqueCurrencyIds[0];
+
+    return defaultCurrencyId;
   }
 
   /**
